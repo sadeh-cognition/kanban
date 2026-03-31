@@ -1,4 +1,5 @@
-2026-03-22 13:08:38 -> mokt -> Add tests for graph update function -> Moved from In Progress to Done
-2026-03-22 13:08:47 -> mokt -> Are we using the caching feature of django_llm_chat? We should! -> Moved from To Do to In Progress
-2026-03-22 16:55:50 -> mokt -> Are we using the caching feature of django_llm_chat? We should! -> Updated details (new title: Use django_llm_chat directly)
-2026-03-22 23:27:44 -> mokt -> Use django_llm_chat directly -> Moved from In Progress to Done
+2026-03-28 20:11:56 -> mokt -> Bug fix: document text should not be stored in metadata -> Moved from In Progress to Done
+2026-03-28 20:19:50 -> mokt -> Cleanup prompts -> Created in In Progress
+2026-03-28 20:19:51 -> mokt -> Cleanup prompts -> Assigned to mokt
+2026-03-28 20:20:04 -> mokt -> real-ladybug visualizer for django -> Moved from To Do to Done
+2026-03-28 20:26:21 -> mokt -> Cleanup prompts -> Moved from In Progress to Done

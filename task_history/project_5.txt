@@ -1,0 +1,4 @@
+2026-03-28 13:09:52 -> mokt -> Send the whole chat to knowledge graph -> Created in In Progress
+2026-03-28 13:09:54 -> mokt -> Send the whole chat to knowledge graph -> Assigned to mokt
+2026-03-28 13:10:29 -> mokt -> Send the whole chat to knowledge graph -> Moved from In Progress to Done
+2026-03-28 13:11:16 -> mokt -> Add /save-kg command -> Created in In Progress
