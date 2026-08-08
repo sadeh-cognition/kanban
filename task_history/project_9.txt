@@ -1,8 +1,6 @@
-2026-08-06 20:53:06 -> mokt -> Create T3 inspired python package -> Created in To Do
-2026-08-06 20:53:08 -> mokt -> Create T3 inspired python package -> Assigned to mokt
-2026-08-06 20:53:09 -> mokt -> Create T3 inspired python package -> Moved from To Do to In Progress
-2026-08-06 21:41:16 -> mokt -> Create T3 inspired python package -> Moved from In Progress to Done
-2026-08-06 21:41:27 -> mokt -> Add django backend integration -> Created in To Do
-2026-08-06 21:41:28 -> mokt -> Add django backend integration -> Assigned to mokt
-2026-08-06 21:41:29 -> mokt -> Add django backend integration -> Moved from To Do to In Progress
-2026-08-08 20:43:35 -> mokt -> Add django backend integration -> Updated details (new title: phase 7)
+2026-08-08 21:52:07 -> mokt -> phase 8 -> Created in To Do
+2026-08-08 21:52:12 -> mokt -> phase 9 -> Created in To Do
+2026-08-08 21:52:13 -> mokt -> phase 8 -> Assigned to mokt
+2026-08-08 21:52:14 -> mokt -> phase 9 -> Assigned to mokt
+2026-08-08 21:52:17 -> mokt -> phase 9 -> Created in To Do
+2026-08-08 21:52:18 -> mokt -> phase 9 -> Assigned to mokt

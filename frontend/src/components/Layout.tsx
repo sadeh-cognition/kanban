@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import type { ReactNode } from 'react'
+import { ProjectSwitcher } from './ProjectSwitcher'
 
 type LayoutProps = {
   children: ReactNode
@@ -21,6 +22,7 @@ export function Layout({ children, actions }: LayoutProps) {
           </Link>
         </div>
         <div className="header-actions">
+          {user && <ProjectSwitcher />}
           {user && (
             <button
               type="button"

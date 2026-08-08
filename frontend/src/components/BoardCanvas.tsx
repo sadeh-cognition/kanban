@@ -21,6 +21,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { useMemo, useState } from 'react'
 import { ApiClientError, api } from '../api/client'
 import type { Board, Column, Task } from '../api/types'
+import { useAuth } from '../auth/AuthContext'
 
 type BoardCanvasProps = {
   board: Board
@@ -66,10 +67,12 @@ function TaskCardView({
   task,
   onOpen,
   dragging,
+  onAssignToMe,
 }: {
   task: Task
   onOpen?: () => void
   dragging?: boolean
+  onAssignToMe?: () => void
 }) {
   return (
     <div
@@ -98,6 +101,21 @@ function TaskCardView({
           <span className="assignee-chip">{task.assigned_to.username}</span>
         )}
       </div>
+      {onAssignToMe && (
+        <div className="task-actions">
+          <button
+            type="button"
+            className="btn btn-sm btn-ghost"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation()
+              onAssignToMe()
+            }}
+          >
+            Assign to me
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -105,9 +123,11 @@ function TaskCardView({
 function SortableTask({
   task,
   onOpen,
+  onAssignToMe,
 }: {
   task: Task
   onOpen: () => void
+  onAssignToMe?: () => void
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: taskId(task.id), data: { type: 'task', task } })
@@ -120,7 +140,7 @@ function SortableTask({
 
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
-      <TaskCardView task={task} onOpen={onOpen} />
+      <TaskCardView task={task} onOpen={onOpen} onAssignToMe={onAssignToMe} />
     </div>
   )
 }
@@ -130,11 +150,15 @@ function SortableColumn({
   onOpenTask,
   onCreateTask,
   onDeleteColumn,
+  onAssignToMe,
+  currentUserId,
 }: {
   column: Column
   onOpenTask: (taskId: number) => void
   onCreateTask: (columnId: number) => void
   onDeleteColumn: (columnId: number) => void
+  onAssignToMe: (task: Task) => void
+  currentUserId: number | null
 }) {
   const {
     attributes,
@@ -178,6 +202,11 @@ function SortableColumn({
               key={task.id}
               task={task}
               onOpen={() => onOpenTask(task.id)}
+              onAssignToMe={
+                currentUserId != null && task.assigned_to?.id !== currentUserId
+                  ? () => onAssignToMe(task)
+                  : undefined
+              }
             />
           ))}
         </SortableContext>
@@ -203,7 +232,12 @@ export function BoardCanvas({
   onCreateTask,
   onError,
 }: BoardCanvasProps) {
+  const { user } = useAuth()
   const [activeTask, setActiveTask] = useState<Task | null>(null)
+  const [dragOrigin, setDragOrigin] = useState<{
+    columnId: number
+    index: number
+  } | null>(null)
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
   )
@@ -217,13 +251,35 @@ export function BoardCanvas({
     onBoardChange({ ...board, columns })
   }
 
+  async function assignToMe(task: Task) {
+    if (!user) return
+    try {
+      const updated = await api.assignTask(task.id, user.id)
+      setColumns(
+        board.columns.map((column) => ({
+          ...column,
+          tasks: column.tasks.map((t) => (t.id === updated.id ? updated : t)),
+        })),
+      )
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'Failed to assign task')
+    }
+  }
+
   function onDragStart(event: DragStartEvent) {
     const tid = parseTaskId(event.active.id)
     if (tid !== null) {
+      const sourceColumn = findColumnForTask(board.columns, event.active.id)
       const task = board.columns
         .flatMap((c) => c.tasks)
         .find((t) => t.id === tid)
       setActiveTask(task ?? null)
+      if (sourceColumn) {
+        setDragOrigin({
+          columnId: sourceColumn.id,
+          index: sourceColumn.tasks.findIndex((t) => t.id === tid),
+        })
+      }
     }
   }
 
@@ -272,7 +328,9 @@ export function BoardCanvas({
 
   async function onDragEnd(event: DragEndEvent) {
     const { active, over } = event
+    const origin = dragOrigin
     setActiveTask(null)
+    setDragOrigin(null)
     if (!over) return
 
     const activeColumnId = parseColumnId(active.id)
@@ -309,15 +367,29 @@ export function BoardCanvas({
         : overColumn.tasks.findIndex((t) => t.id === overTaskId)
 
     if (column.id === overColumn.id) {
-      if (oldIndex === newIndex || newIndex < 0) return
-      const nextTasks = arrayMove(column.tasks, oldIndex, newIndex)
-      setColumns(
-        board.columns.map((c) =>
-          c.id === column.id ? { ...c, tasks: nextTasks } : c,
-        ),
-      )
+      // onDragOver may already have moved the task into this column, so the
+      // indexes can match even when the server still has the old column.
+      let finalIndex = oldIndex
+      if (oldIndex !== newIndex && newIndex >= 0) {
+        const nextTasks = arrayMove(column.tasks, oldIndex, newIndex)
+        setColumns(
+          board.columns.map((c) =>
+            c.id === column.id ? { ...c, tasks: nextTasks } : c,
+          ),
+        )
+        finalIndex = newIndex
+      }
+
+      if (
+        origin &&
+        origin.columnId === column.id &&
+        origin.index === finalIndex
+      ) {
+        return
+      }
+
       try {
-        await api.moveTask(activeTaskId, column.id, newIndex)
+        await api.moveTask(activeTaskId, column.id, finalIndex)
       } catch (err) {
         onError(err instanceof Error ? err.message : 'Failed to move task')
       }
@@ -372,6 +444,8 @@ export function BoardCanvas({
               onOpenTask={onOpenTask}
               onCreateTask={onCreateTask}
               onDeleteColumn={(id) => void onDeleteColumn(id)}
+              onAssignToMe={(task) => void assignToMe(task)}
+              currentUserId={user?.id ?? null}
             />
           ))}
         </div>

@@ -374,6 +374,120 @@ textarea.form-control {
 .header-actions {
     display: flex;
     align-items: center;
+    gap: 0.25rem;
+}
+
+.project-switcher {
+    position: relative;
+    margin-right: 0.25rem;
+}
+
+.project-switcher-trigger {
+    gap: 0.35rem;
+    max-width: 14rem;
+}
+
+.project-switcher-trigger span:first-child,
+.project-switcher-trigger {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.project-switcher-caret {
+    font-size: 0.7rem;
+    opacity: 0.75;
+    flex-shrink: 0;
+}
+
+.project-switcher-menu {
+    position: absolute;
+    top: calc(100% + 0.4rem);
+    right: 0;
+    width: min(20rem, calc(100vw - 2rem));
+    background: var(--bg-surface-hover);
+    border: 1px solid var(--card-border);
+    border-radius: 0.75rem;
+    box-shadow: var(--shadow-lg);
+    backdrop-filter: blur(12px);
+    z-index: 40;
+    padding: 0.5rem 0;
+    overflow: hidden;
+}
+
+.project-switcher-section + .project-switcher-section {
+    border-top: 1px solid var(--card-border);
+    margin-top: 0.35rem;
+    padding-top: 0.35rem;
+}
+
+.project-switcher-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    padding: 0.35rem 0.85rem 0.25rem;
+}
+
+.project-switcher-empty,
+.project-switcher-hint {
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    padding: 0.25rem 0.85rem 0.5rem;
+}
+
+.project-switcher-hint {
+    padding-top: 0.15rem;
+}
+
+.project-switcher-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: 14rem;
+    overflow-y: auto;
+}
+
+.project-switcher-item {
+    display: flex;
+    align-items: center;
+    gap: 0.15rem;
+    padding: 0 0.35rem;
+}
+
+.project-switcher-link {
+    flex: 1;
+    text-align: left;
+    background: transparent;
+    border: none;
+    color: var(--text-primary);
+    font-family: var(--font-body);
+    font-size: 0.875rem;
+    padding: 0.45rem 0.5rem;
+    border-radius: 0.4rem;
+    cursor: pointer;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.project-switcher-link:hover,
+.project-switcher-link.is-active {
+    background: var(--card-bg);
+}
+
+.project-switcher-link.is-active {
+    color: var(--accent-color);
+}
+
+.project-switcher-remove {
+    flex-shrink: 0;
+    width: 1.75rem;
+    height: 1.75rem;
+    padding: 0;
+    font-size: 1.1rem;
+    line-height: 1;
 }
 
 .page-pad {
