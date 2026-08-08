@@ -1,217 +1,404 @@
-from ninja import NinjaAPI, Form, Schema
-from django.shortcuts import render, get_object_or_404
-from django.http import HttpResponse
-from django.db import transaction
 import os
-from django.contrib.auth import get_user_model
+from datetime import datetime
+
+from django.contrib.auth import authenticate, get_user_model, login, logout
+from django.db import transaction
+from django.contrib.auth.models import AbstractBaseUser
+from django.http import HttpRequest
+from django.middleware.csrf import get_token
+from django.shortcuts import get_object_or_404
+from ninja import NinjaAPI, Schema
+from ninja.security import django_auth
+
+from .history_logger import get_history_file_path, log_task_change
 from .models import (
     Board,
     Column,
-    Task,
     Project,
     Tag,
-    TaskStatusHistory,
+    Task,
     TaskAssignmentHistory,
+    TaskStatusHistory,
 )
-from .history_logger import log_task_change, get_history_file_path
 
 User = get_user_model()
 
-api = NinjaAPI(title="Kanban API", description="API for HTMX Operations")
-
-# --- Project Endpoints ---
-
-
-@api.get("/projects/form")
-def get_project_form(request):
-    """Returns the form modal for creating a new project"""
-    return render(request, "kanban_app/partials/project_form.html")
+api = NinjaAPI(
+    title="Kanban API",
+    description="JSON API for the Kanban SPA",
+    auth=django_auth,
+)
 
 
-class ProjectFormSchema(Schema):
+# --- Schemas ---
+
+
+class UserSchema(Schema):
+    id: int
+    username: str
+
+
+class LoginSchema(Schema):
+    username: str
+    password: str
+
+
+class ProjectSchema(Schema):
+    id: int
     name: str
 
 
-@api.post("/projects")
-def create_project(request, data: Form[ProjectFormSchema]):
-    """Creates a new project"""
-    Project.objects.create(name=data.name)
-    response = HttpResponse()
-    response["HX-Trigger"] = "projectListUpdated, closeModal"
-    return response
+class ProjectCreateSchema(Schema):
+    name: str
 
 
-@api.get("/projects/list")
-def get_projects_list(request):
-    """Returns the updated list of projects"""
-    projects = Project.objects.all()
-    return render(request, "kanban_app/partials/projects.html", {"projects": projects})
+class TagSchema(Schema):
+    id: int
+    name: str
+    color: str
 
 
-@api.delete("/projects/{project_id}")
-def delete_project(request, project_id: int):
-    """Deletes a project"""
-    project = get_object_or_404(Project, id=project_id)
-    project.delete()
-
-    response = HttpResponse()
-    # Trigger HTMX to reload the projects list
-    response["HX-Trigger"] = "projectListUpdated"
-    return response
-
-
-# --- Tag Endpoints ---
-
-
-@api.get("/projects/{project_id}/tags")
-def get_project_tags(request, project_id: int):
-    """Returns the tags partial for a project"""
-    project = get_object_or_404(Project, id=project_id)
-    tags = project.tags.all()
-    return render(
-        request, "kanban_app/partials/tags.html", {"project": project, "tags": tags}
-    )
-
-
-class TagFormSchema(Schema):
+class TagCreateSchema(Schema):
     name: str
     color: str = "#3b82f6"
 
 
-@api.post("/projects/{project_id}/tags")
-def create_tag(request, project_id: int, data: Form[TagFormSchema]):
-    """Creates a new tag for the project"""
-    project = get_object_or_404(Project, id=project_id)
-    Tag.objects.create(project=project, name=data.name, color=data.color)
-
-    response = HttpResponse()
-    response["HX-Trigger"] = "tagsUpdated"
-    return response
-
-
-@api.delete("/tags/{tag_id}")
-def delete_tag(request, tag_id: int):
-    """Deletes a tag"""
-    tag = get_object_or_404(Tag, id=tag_id)
-    tag.delete()
-
-    response = HttpResponse()
-    response["HX-Trigger"] = "tagsUpdated, columnUpdated"
-    return response
-
-
-# --- Column Endpoints ---
-
-
-@api.get("/boards/{board_id}/columns")
-def get_columns(request, board_id: int):
-    """Returns the HTML for all columns in the board"""
-    board = get_object_or_404(Board, id=board_id)
-    columns = board.columns.all()
-    return render(request, "kanban_app/partials/columns.html", {"columns": columns})
-
-
-@api.get("/boards/{board_id}/columns/form")
-def get_column_form(request, board_id: int):
-    """Returns the form modal for creating a new column"""
-    return render(
-        request, "kanban_app/partials/column_form.html", {"board_id": board_id}
-    )
-
-
-class ColumnFormSchema(Schema):
+class ColumnCreateSchema(Schema):
     name: str
-
-
-@api.post("/boards/{board_id}/columns")
-def create_column(request, board_id: int, data: Form[ColumnFormSchema]):
-    """Creates a new column and triggers fetching columns"""
-    board = get_object_or_404(Board, id=board_id)
-
-    # Get highest order
-    last_col = board.columns.last()
-    order = (last_col.order + 1) if last_col else 0
-
-    Column.objects.create(board=board, name=data.name, order=order)
-
-    response = HttpResponse()
-    # Trigger HTMX to reload the body, and close the modal
-    response["HX-Trigger"] = "columnUpdated, closeModal"
-    return response
-
-
-@api.delete("/columns/{column_id}")
-def delete_column(request, column_id: int):
-    """Deletes a column"""
-    column = get_object_or_404(Column, id=column_id)
-    column.delete()
-
-    response = HttpResponse()
-    # Trigger HTMX to reload the body
-    response["HX-Trigger"] = "columnUpdated"
-    return response
 
 
 class MoveColumnSchema(Schema):
     new_order: int
 
 
-@api.post("/columns/{column_id}/move")
-def move_column(request, column_id: int, data: Form[MoveColumnSchema]):
-    """Moves a column to a new order"""
-    column = get_object_or_404(Column, id=column_id)
-    board = column.board
-    new_order = data.new_order
-
-    columns = list(board.columns.exclude(id=column.id))
-    # Insert at new position
-    columns.insert(new_order, column)
-
-    # Update orders
-    for index, col in enumerate(columns):
-        col.order = index
-        col.save()
-
-    return HttpResponse(status=204)  # No Content, Sortable handles UI
-
-
-# --- Task Endpoints ---
-
-
-@api.get("/columns/{column_id}/tasks/form")
-def get_task_form(request, column_id: int):
-    """Returns the form modal for creating a new task in a specific column"""
-    column = get_object_or_404(Column, id=column_id)
-    tags = column.board.project.tags.all()
-    return render(
-        request,
-        "kanban_app/partials/task_form.html",
-        {"column_id": column_id, "tags": tags},
-    )
-
-
-class TaskFormSchema(Schema):
+class TaskCreateSchema(Schema):
     title: str
     description: str = ""
     tags: list[int] = []
 
 
-@api.post("/columns/{column_id}/tasks")
-def create_task(request, column_id: int, data: Form[TaskFormSchema]):
-    """Creates a new task in the given column"""
+class TaskUpdateSchema(Schema):
+    title: str
+    description: str = ""
+
+
+class TaskTagsSchema(Schema):
+    tags: list[int] = []
+
+
+class MoveTaskSchema(Schema):
+    new_column_id: int
+    new_order: int
+
+
+class TaskAssignSchema(Schema):
+    user_id: int | None = None
+
+
+class ColumnNameSchema(Schema):
+    id: int
+    name: str
+
+
+class HistoryEntrySchema(Schema):
+    type: str
+    changed_at: datetime
+    old_column: ColumnNameSchema | None = None
+    new_column: ColumnNameSchema | None = None
+    old_assignee: UserSchema | None = None
+    new_assignee: UserSchema | None = None
+
+
+class TaskSchema(Schema):
+    id: int
+    project_task_id: int | None
+    title: str
+    description: str
+    order: int
+    column_id: int
+    tags: list[TagSchema]
+    assigned_to: UserSchema | None
+
+
+class TaskDetailSchema(TaskSchema):
+    history: list[HistoryEntrySchema]
+
+
+class ColumnSchema(Schema):
+    id: int
+    name: str
+    order: int
+    tasks: list[TaskSchema]
+
+
+class BoardSchema(Schema):
+    id: int
+    name: str
+    columns: list[ColumnSchema]
+
+
+class BoardPayloadSchema(Schema):
+    project: ProjectSchema
+    board: BoardSchema
+    history_content: str | None
+
+
+class MessageSchema(Schema):
+    detail: str
+
+
+class CsrfSchema(Schema):
+    detail: str = "ok"
+
+
+# --- Helpers ---
+
+
+def _user_schema(user: AbstractBaseUser | None) -> UserSchema | None:
+    if user is None:
+        return None
+    return UserSchema(id=user.pk, username=user.get_username())
+
+
+def _tag_schema(tag: Tag) -> TagSchema:
+    return TagSchema(id=tag.id, name=tag.name, color=tag.color)
+
+
+def _task_schema(task: Task) -> TaskSchema:
+    return TaskSchema(
+        id=task.id,
+        project_task_id=task.project_task_id,
+        title=task.title,
+        description=task.description,
+        order=task.order,
+        column_id=task.column_id,
+        tags=[_tag_schema(tag) for tag in task.tags.all()],
+        assigned_to=_user_schema(task.assigned_to),
+    )
+
+
+def _column_schema(column: Column) -> ColumnSchema:
+    return ColumnSchema(
+        id=column.id,
+        name=column.name,
+        order=column.order,
+        tasks=[_task_schema(task) for task in column.tasks.all()],
+    )
+
+
+def _board_schema(board: Board) -> BoardSchema:
+    columns = board.columns.prefetch_related("tasks__tags", "tasks__assigned_to")
+    return BoardSchema(
+        id=board.id,
+        name=board.name,
+        columns=[_column_schema(column) for column in columns],
+    )
+
+
+def _ensure_board(project: Project) -> Board:
+    if not hasattr(project, "board"):
+        board = Board.objects.create(project=project, name=f"{project.name} Board")
+        Column.objects.create(board=board, name="To Do", order=0)
+        Column.objects.create(board=board, name="In Progress", order=1)
+        Column.objects.create(board=board, name="Done", order=2)
+        return board
+    return project.board
+
+
+def _read_history_content(project_id: int) -> str | None:
+    file_path = get_history_file_path(project_id)
+    if not os.path.exists(file_path):
+        return None
+    with open(file_path, "r") as f:
+        return f.read()
+
+
+def _task_history(task: Task) -> list[HistoryEntrySchema]:
+    history: list[HistoryEntrySchema] = []
+    for entry in task.status_history.select_related("old_column", "new_column").all():
+        history.append(
+            HistoryEntrySchema(
+                type="status",
+                changed_at=entry.changed_at,
+                old_column=(
+                    ColumnNameSchema(id=entry.old_column.id, name=entry.old_column.name)
+                    if entry.old_column
+                    else None
+                ),
+                new_column=ColumnNameSchema(
+                    id=entry.new_column.id, name=entry.new_column.name
+                ),
+            )
+        )
+    for entry in task.assignment_history.select_related(
+        "old_assignee", "new_assignee"
+    ).all():
+        history.append(
+            HistoryEntrySchema(
+                type="assignment",
+                changed_at=entry.changed_at,
+                old_assignee=_user_schema(entry.old_assignee),
+                new_assignee=_user_schema(entry.new_assignee),
+            )
+        )
+    history.sort(key=lambda item: item.changed_at)
+    return history
+
+
+def _actor_name(request: HttpRequest) -> str:
+    if request.user.is_authenticated:
+        return request.user.username
+    return "System"
+
+
+# --- Auth (public) ---
+
+
+@api.get("/auth/csrf", auth=None, response=CsrfSchema)
+def get_csrf(request: HttpRequest) -> CsrfSchema:
+    get_token(request)
+    return CsrfSchema()
+
+
+@api.post("/auth/login", auth=None, response={200: UserSchema, 400: MessageSchema})
+def auth_login(
+    request: HttpRequest, data: LoginSchema
+) -> tuple[int, UserSchema | MessageSchema]:
+    user = authenticate(request, username=data.username, password=data.password)
+    if user is None:
+        return 400, MessageSchema(detail="Invalid username or password.")
+    login(request, user)
+    return 200, UserSchema(id=user.id, username=user.username)
+
+
+@api.post("/auth/logout", auth=None, response=CsrfSchema)
+def auth_logout(request: HttpRequest) -> CsrfSchema:
+    logout(request)
+    return CsrfSchema()
+
+
+@api.get("/auth/me", response=UserSchema)
+def auth_me(request: HttpRequest) -> UserSchema:
+    return UserSchema(id=request.user.id, username=request.user.username)
+
+
+# --- Users ---
+
+
+@api.get("/users", response=list[UserSchema])
+def list_users(request: HttpRequest) -> list[UserSchema]:
+    return [
+        UserSchema(id=user.id, username=user.username) for user in User.objects.all()
+    ]
+
+
+# --- Projects ---
+
+
+@api.get("/projects", response=list[ProjectSchema])
+def list_projects(request: HttpRequest) -> list[ProjectSchema]:
+    return [ProjectSchema(id=p.id, name=p.name) for p in Project.objects.all()]
+
+
+@api.post("/projects", response={201: ProjectSchema})
+def create_project(
+    request: HttpRequest, data: ProjectCreateSchema
+) -> tuple[int, ProjectSchema]:
+    project = Project.objects.create(name=data.name)
+    return 201, ProjectSchema(id=project.id, name=project.name)
+
+
+@api.delete("/projects/{project_id}", response={204: None})
+def delete_project(request: HttpRequest, project_id: int) -> tuple[int, None]:
+    project = get_object_or_404(Project, id=project_id)
+    project.delete()
+    return 204, None
+
+
+@api.get("/projects/{project_id}/board", response=BoardPayloadSchema)
+def get_project_board(request: HttpRequest, project_id: int) -> BoardPayloadSchema:
+    project = get_object_or_404(Project, id=project_id)
+    board = _ensure_board(project)
+    return BoardPayloadSchema(
+        project=ProjectSchema(id=project.id, name=project.name),
+        board=_board_schema(board),
+        history_content=_read_history_content(project_id),
+    )
+
+
+# --- Tags ---
+
+
+@api.get("/projects/{project_id}/tags", response=list[TagSchema])
+def list_project_tags(request: HttpRequest, project_id: int) -> list[TagSchema]:
+    project = get_object_or_404(Project, id=project_id)
+    return [_tag_schema(tag) for tag in project.tags.all()]
+
+
+@api.post("/projects/{project_id}/tags", response={201: TagSchema})
+def create_tag(
+    request: HttpRequest, project_id: int, data: TagCreateSchema
+) -> tuple[int, TagSchema]:
+    project = get_object_or_404(Project, id=project_id)
+    tag = Tag.objects.create(project=project, name=data.name, color=data.color)
+    return 201, _tag_schema(tag)
+
+
+@api.delete("/tags/{tag_id}", response={204: None})
+def delete_tag(request: HttpRequest, tag_id: int) -> tuple[int, None]:
+    tag = get_object_or_404(Tag, id=tag_id)
+    tag.delete()
+    return 204, None
+
+
+# --- Columns ---
+
+
+@api.post("/boards/{board_id}/columns", response={201: ColumnSchema})
+def create_column(
+    request: HttpRequest, board_id: int, data: ColumnCreateSchema
+) -> tuple[int, ColumnSchema]:
+    board = get_object_or_404(Board, id=board_id)
+    last_col = board.columns.last()
+    order = (last_col.order + 1) if last_col else 0
+    column = Column.objects.create(board=board, name=data.name, order=order)
+    return 201, _column_schema(column)
+
+
+@api.delete("/columns/{column_id}", response={204: None})
+def delete_column(request: HttpRequest, column_id: int) -> tuple[int, None]:
+    column = get_object_or_404(Column, id=column_id)
+    column.delete()
+    return 204, None
+
+
+@api.post("/columns/{column_id}/move", response={204: None})
+def move_column(
+    request: HttpRequest, column_id: int, data: MoveColumnSchema
+) -> tuple[int, None]:
+    column = get_object_or_404(Column, id=column_id)
+    board = column.board
+    columns = list(board.columns.exclude(id=column.id))
+    columns.insert(data.new_order, column)
+    for index, col in enumerate(columns):
+        col.order = index
+        col.save()
+    return 204, None
+
+
+# --- Tasks ---
+
+
+@api.post("/columns/{column_id}/tasks", response={201: TaskSchema})
+def create_task(
+    request: HttpRequest, column_id: int, data: TaskCreateSchema
+) -> tuple[int, TaskSchema]:
     column = get_object_or_404(Column, id=column_id)
 
-    # Wrap in transaction to safely generate sequential ID
     with transaction.atomic():
-        # Get the project for this column's board, locking the row to prevent
-        # race conditions
         project = Project.objects.select_for_update().get(board=column.board)
-
-        # Get highest order
         last_task = column.tasks.last()
         order = (last_task.order + 1) if last_task else 0
-
-        # Determine the project-specific ID
         task_id = project.next_task_id
 
         task = Task.objects.create(
@@ -221,191 +408,36 @@ def create_task(request, column_id: int, data: Form[TaskFormSchema]):
             order=order,
             project_task_id=task_id,
         )
-
         TaskStatusHistory.objects.create(task=task, new_column=column)
-
         log_task_change(
             project.id,
-            request.user.username if request.user.is_authenticated else "System",
+            _actor_name(request),
             task.title,
             f"Created in {column.name}",
         )
-
         if data.tags:
             task.tags.set(data.tags)
 
-        # Increment project counter
         project.next_task_id += 1
         project.save()
 
-    response = HttpResponse()
-    # Trigger HTMX to reload the board
-    response["HX-Trigger"] = "columnUpdated, closeModal"
-    return response
+    task = Task.objects.prefetch_related("tags", "assigned_to").get(id=task.id)
+    return 201, _task_schema(task)
 
 
-@api.delete("/tasks/{task_id}")
-def delete_task(request, task_id: int):
-    """Deletes a task"""
-    task = get_object_or_404(Task, id=task_id)
-    project_id = task.column.board.project_id
-    task_title = task.title
-    task.delete()
-
-    log_task_change(
-        project_id,
-        request.user.username if request.user.is_authenticated else "System",
-        task_title,
-        "Deleted task",
+@api.get("/tasks/{task_id}", response=TaskDetailSchema)
+def get_task(request: HttpRequest, task_id: int) -> TaskDetailSchema:
+    task = get_object_or_404(
+        Task.objects.prefetch_related("tags", "assigned_to"), id=task_id
     )
-
-    response = HttpResponse()
-    response["HX-Trigger"] = "columnUpdated"
-    return response
+    base = _task_schema(task)
+    return TaskDetailSchema(**base.model_dump(), history=_task_history(task))
 
 
-@api.get("/tasks/{task_id}/tags/form")
-def get_task_tags_form(request, task_id: int):
-    """Returns the form modal for managing tags for a specific task"""
-    task = get_object_or_404(Task, id=task_id)
-    project = task.column.board.project
-    tags = project.tags.all()
-    # We need to pass the IDs of the currently assigned tags
-    task_tag_ids = list(task.tags.values_list("id", flat=True))
-    return render(
-        request,
-        "kanban_app/partials/task_tags_form.html",
-        {"task": task, "tags": tags, "task_tag_ids": task_tag_ids},
-    )
-
-
-class TaskTagsFormSchema(Schema):
-    tags: list[int] = []
-
-
-@api.post("/tasks/{task_id}/tags")
-def update_task_tags(request, task_id: int, data: Form[TaskTagsFormSchema]):
-    """Updates the tags for a task"""
-    task = get_object_or_404(Task, id=task_id)
-    task.tags.set(data.tags)
-
-    log_task_change(
-        task.column.board.project_id,
-        request.user.username if request.user.is_authenticated else "System",
-        task.title,
-        "Tags updated",
-    )
-
-    response = HttpResponse()
-    # Trigger HTMX to reload the board and close the modal
-    response["HX-Trigger"] = "columnUpdated, closeModal"
-    return response
-
-
-class MoveTaskSchema(Schema):
-    new_column_id: int
-    new_order: int
-
-
-@api.post("/tasks/{task_id}/move")
-def move_task(request, task_id: int, data: Form[MoveTaskSchema]):
-    """Moves a task between columns or to a new order"""
-    task = get_object_or_404(Task, id=task_id)
-    new_col = get_object_or_404(Column, id=data.new_column_id)
-    new_order = data.new_order
-
-    # Same column movement
-    if task.column_id == new_col.id:
-        tasks = list(new_col.tasks.exclude(id=task.id))
-        tasks.insert(new_order, task)
-        for idx, t in enumerate(tasks):
-            t.order = idx
-            t.save()
-    else:
-        old_col = task.column
-        # Change column
-        if task.assigned_to_id is None:
-            return HttpResponse("Unassigned tasks cannot change status.", status=400)
-
-        task.column = new_col
-        task.save()
-
-        TaskStatusHistory.objects.create(
-            task=task, old_column=old_col, new_column=new_col
-        )
-
-        log_task_change(
-            old_col.board.project_id,
-            request.user.username if request.user.is_authenticated else "System",
-            task.title,
-            f"Moved from {old_col.name} to {new_col.name}",
-        )
-
-        # Insert in new column
-        tasks = list(new_col.tasks.exclude(id=task.id))
-        tasks.insert(new_order, task)
-        for idx, t in enumerate(tasks):
-            t.order = idx
-            t.save()
-
-    return HttpResponse(status=204)
-
-
-@api.get("/tasks/{task_id}/details")
-def get_task_details(request, task_id: int):
-    """Returns the details view for a task."""
-    task = get_object_or_404(Task, id=task_id)
-    project = task.column.board.project
-    tags = project.tags.all()
-    # We need to pass the IDs of the currently assigned tags
-    task_tag_ids = list(task.tags.values_list("id", flat=True))
-    users = User.objects.all()
-
-    # Build combined chronological change history
-    history: list[dict] = []
-    for entry in task.status_history.select_related("old_column", "new_column").all():
-        history.append(
-            {
-                "type": "status",
-                "changed_at": entry.changed_at,
-                "old_column": entry.old_column,
-                "new_column": entry.new_column,
-            }
-        )
-    for entry in task.assignment_history.select_related(
-        "old_assignee", "new_assignee"
-    ).all():
-        history.append(
-            {
-                "type": "assignment",
-                "changed_at": entry.changed_at,
-                "old_assignee": entry.old_assignee,
-                "new_assignee": entry.new_assignee,
-            }
-        )
-    history.sort(key=lambda x: x["changed_at"])
-
-    return render(
-        request,
-        "kanban_app/partials/task_details.html",
-        {
-            "task": task,
-            "tags": tags,
-            "task_tag_ids": task_tag_ids,
-            "users": users,
-            "history": history,
-        },
-    )
-
-
-class TaskUpdateDetailsSchema(Schema):
-    title: str
-    description: str = ""
-
-
-@api.post("/tasks/{task_id}/update_details")
-def update_task_details(request, task_id: int, data: Form[TaskUpdateDetailsSchema]):
-    """Updates the details for a task"""
+@api.patch("/tasks/{task_id}", response=TaskSchema)
+def update_task(
+    request: HttpRequest, task_id: int, data: TaskUpdateSchema
+) -> TaskSchema:
     task = get_object_or_404(Task, id=task_id)
     old_title = task.title
     task.title = data.title
@@ -414,78 +446,118 @@ def update_task_details(request, task_id: int, data: Form[TaskUpdateDetailsSchem
 
     log_task_change(
         task.column.board.project_id,
-        request.user.username if request.user.is_authenticated else "System",
+        _actor_name(request),
         old_title,
         f"Updated details (new title: {task.title})"
         if old_title != task.title
         else "Updated details",
     )
-
-    response = HttpResponse()
-    # Trigger HTMX to reload the board
-    response["HX-Trigger"] = "columnUpdated"
-    return response
+    task = Task.objects.prefetch_related("tags", "assigned_to").get(id=task.id)
+    return _task_schema(task)
 
 
-# --- Assignment Endpoints ---
-
-
-@api.get("/tasks/{task_id}/assign/form")
-def get_task_assign_form(request, task_id: int):
-    """Returns the form modal for assigning a user to a task"""
+@api.delete("/tasks/{task_id}", response={204: None})
+def delete_task(request: HttpRequest, task_id: int) -> tuple[int, None]:
     task = get_object_or_404(Task, id=task_id)
-    users = User.objects.all()
-    return render(
-        request,
-        "kanban_app/partials/task_assign_form.html",
-        {"task": task, "users": users},
+    project_id = task.column.board.project_id
+    task_title = task.title
+    task.delete()
+    log_task_change(project_id, _actor_name(request), task_title, "Deleted task")
+    return 204, None
+
+
+@api.post("/tasks/{task_id}/tags", response=TaskSchema)
+def update_task_tags(
+    request: HttpRequest, task_id: int, data: TaskTagsSchema
+) -> TaskSchema:
+    task = get_object_or_404(Task, id=task_id)
+    task.tags.set(data.tags)
+    log_task_change(
+        task.column.board.project_id,
+        _actor_name(request),
+        task.title,
+        "Tags updated",
     )
+    task = Task.objects.prefetch_related("tags", "assigned_to").get(id=task.id)
+    return _task_schema(task)
 
 
-class TaskAssignFormSchema(Schema):
-    user_id: str | None = None
-
-
-@api.post("/tasks/{task_id}/assign")
-def assign_task(request, task_id: int, data: Form[TaskAssignFormSchema]):
-    """Assigns a task to a user"""
+@api.post("/tasks/{task_id}/move", response={204: None, 400: MessageSchema})
+def move_task(
+    request: HttpRequest, task_id: int, data: MoveTaskSchema
+) -> tuple[int, None | MessageSchema]:
     task = get_object_or_404(Task, id=task_id)
+    new_col = get_object_or_404(Column, id=data.new_column_id)
+    new_order = data.new_order
 
+    if task.column_id == new_col.id:
+        tasks = list(new_col.tasks.exclude(id=task.id))
+        tasks.insert(new_order, task)
+        for idx, item in enumerate(tasks):
+            item.order = idx
+            item.save()
+    else:
+        if task.assigned_to_id is None:
+            return 400, MessageSchema(detail="Unassigned tasks cannot change status.")
+
+        old_col = task.column
+        task.column = new_col
+        task.save()
+
+        TaskStatusHistory.objects.create(
+            task=task, old_column=old_col, new_column=new_col
+        )
+        log_task_change(
+            old_col.board.project_id,
+            _actor_name(request),
+            task.title,
+            f"Moved from {old_col.name} to {new_col.name}",
+        )
+
+        tasks = list(new_col.tasks.exclude(id=task.id))
+        tasks.insert(new_order, task)
+        for idx, item in enumerate(tasks):
+            item.order = idx
+            item.save()
+
+    return 204, None
+
+
+@api.post("/tasks/{task_id}/assign", response=TaskSchema)
+def assign_task(
+    request: HttpRequest, task_id: int, data: TaskAssignSchema
+) -> TaskSchema:
+    task = get_object_or_404(Task, id=task_id)
     old_assignee_id = task.assigned_to_id
-    new_assignee_id = int(data.user_id) if data.user_id else None
+    new_assignee_id = data.user_id
 
     if old_assignee_id != new_assignee_id:
         task.assigned_to_id = new_assignee_id
         task.save()
-
         TaskAssignmentHistory.objects.create(
-            task=task, old_assignee_id=old_assignee_id, new_assignee_id=new_assignee_id
+            task=task,
+            old_assignee_id=old_assignee_id,
+            new_assignee_id=new_assignee_id,
         )
-
         assignee_name = task.assigned_to.username if task.assigned_to else "Unassigned"
         log_task_change(
             task.column.board.project_id,
-            request.user.username if request.user.is_authenticated else "System",
+            _actor_name(request),
             task.title,
             f"Assigned to {assignee_name}",
         )
 
-    response = HttpResponse()
-    # Trigger HTMX to reload the board and close the modal
-    response["HX-Trigger"] = "columnUpdated, closeModal"
-    return response
+    task = Task.objects.prefetch_related("tags", "assigned_to").get(id=task.id)
+    return _task_schema(task)
 
 
-# --- History Endpoints ---
+# --- History ---
 
 
-@api.delete("/projects/{project_id}/history")
-def delete_project_history(request, project_id: int):
-    """Deletes the project history file"""
+@api.delete("/projects/{project_id}/history", response={204: None})
+def delete_project_history(request: HttpRequest, project_id: int) -> tuple[int, None]:
     get_object_or_404(Project, id=project_id)
     file_path = get_history_file_path(project_id)
     if os.path.exists(file_path):
         os.remove(file_path)
-
-    # Return empty response to swap the outerHTML and remove the element entirely
-    return HttpResponse("")
+    return 204, None

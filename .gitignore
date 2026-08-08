@@ -1,3 +1,5 @@
 *.pyc
 __pycache__
 kanban_app/migrations/__pycache__
+frontend/node_modules/
+frontend/dist/

@@ -25,7 +25,16 @@ SECRET_KEY = "django-insecure-ld-fqlda@*kw)uil+1va6xi8+8c%=)5o9h1uvl)2nd*@k%awh-
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
+
+# Vite (5174) proxies /api to Django (8005) with changeOrigin, so the browser
+# Origin does not match the Host Django sees. Trust the SPA origins for CSRF.
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:5174",
+    "http://127.0.0.1:5174",
+    "http://localhost:8005",
+    "http://127.0.0.1:8005",
+]
 
 
 # Application definition
@@ -116,7 +125,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = "static/"
-STATICFILES_DIRS = [BASE_DIR / "static"]
+STATICFILES_DIRS = [d for d in [BASE_DIR / "static"] if d.exists()]
 
-LOGIN_REDIRECT_URL = "/"
-LOGOUT_REDIRECT_URL = "/accounts/login/"
+# SPA uses session cookies + readable CSRF cookie for X-CSRFToken header.
+CSRF_COOKIE_HTTPONLY = False
