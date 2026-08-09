@@ -1,6 +1,2 @@
-2026-08-08 21:52:07 -> mokt -> phase 8 -> Created in To Do
-2026-08-08 21:52:12 -> mokt -> phase 9 -> Created in To Do
-2026-08-08 21:52:13 -> mokt -> phase 8 -> Assigned to mokt
-2026-08-08 21:52:14 -> mokt -> phase 9 -> Assigned to mokt
-2026-08-08 21:52:17 -> mokt -> phase 9 -> Created in To Do
-2026-08-08 21:52:18 -> mokt -> phase 9 -> Assigned to mokt
+2026-08-09 21:54:21 -> mokt -> phase 12 -> Moved from In Progress to Done
+2026-08-09 21:54:27 -> mokt -> pull out agent and harness communication logic use talktoharnesses -> Deleted task
