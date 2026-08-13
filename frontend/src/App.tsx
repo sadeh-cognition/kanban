@@ -4,6 +4,7 @@ import { useAuth } from './auth/AuthContext'
 import { BoardPage } from './pages/BoardPage'
 import { LoginPage } from './pages/LoginPage'
 import { ProjectListPage } from './pages/ProjectListPage'
+import { StatusBoardPage } from './pages/StatusBoardPage'
 
 function Protected({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth()
@@ -25,6 +26,14 @@ export default function App() {
         element={
           <Protected>
             <ProjectListPage />
+          </Protected>
+        }
+      />
+      <Route
+        path="/status"
+        element={
+          <Protected>
+            <StatusBoardPage />
           </Protected>
         }
       />

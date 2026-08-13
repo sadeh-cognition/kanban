@@ -156,6 +156,28 @@ def test_create_and_delete_column(auth_client: Client) -> None:
 
 
 @pytest.mark.django_db
+def test_rename_column(auth_client: Client) -> None:
+    column = baker.make(Column, name="To Do")
+    response = auth_client.patch(
+        f"/api/columns/{column.id}",
+        data=json.dumps({"name": "  Backlog  "}),
+        content_type="application/json",
+    )
+    assert response.status_code == 200
+    assert _json(response)["name"] == "Backlog"
+    column.refresh_from_db()
+    assert column.name == "Backlog"
+
+    empty = auth_client.patch(
+        f"/api/columns/{column.id}",
+        data=json.dumps({"name": "   "}),
+        content_type="application/json",
+    )
+    assert empty.status_code == 400
+    assert _json(empty)["detail"] == "Name is required."
+
+
+@pytest.mark.django_db
 def test_move_column(auth_client: Client) -> None:
     board = baker.make(Board)
     col1 = baker.make(Column, board=board, order=0)

@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import type { ReactNode } from 'react'
 import { ProjectSwitcher } from './ProjectSwitcher'
@@ -10,16 +10,35 @@ type LayoutProps = {
 
 export function Layout({ children, actions }: LayoutProps) {
   const { user, logout } = useAuth()
+  const { pathname } = useLocation()
 
   return (
     <div className="app-container">
       <header className="app-header">
-        <div className="logo">
-          <Link to="/" style={{ textDecoration: 'none', color: 'inherit' }}>
-            <h1>
-              Kanban<span>Flow</span>
-            </h1>
-          </Link>
+        <div className="header-left">
+          <div className="logo">
+            <Link to="/" style={{ textDecoration: 'none', color: 'inherit' }}>
+              <h1>
+                Kanban<span>Flow</span>
+              </h1>
+            </Link>
+          </div>
+          {user && (
+            <nav className="header-nav">
+              <Link
+                to="/"
+                className={pathname === '/' ? 'is-active' : undefined}
+              >
+                Projects
+              </Link>
+              <Link
+                to="/status"
+                className={pathname === '/status' ? 'is-active' : undefined}
+              >
+                By Status
+              </Link>
+            </nav>
+          )}
         </div>
         <div className="header-actions">
           {user && <ProjectSwitcher />}

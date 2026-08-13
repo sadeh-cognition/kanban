@@ -74,6 +74,148 @@ h1, h2, h3, h4, h5, h6 {
     color: var(--accent-color);
 }
 
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    min-width: 0;
+}
+
+.header-nav {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.header-nav a {
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.header-nav a:hover,
+.header-nav a.is-active {
+    color: var(--text-primary);
+}
+
+.status-canvas {
+    flex: 1;
+    overflow: auto;
+    min-height: 0;
+}
+
+.status-canvas-surface {
+    position: relative;
+}
+
+.column.status-group {
+    position: absolute;
+    height: min(70vh, 640px);
+    max-height: min(70vh, 640px);
+}
+
+.status-group-handle {
+    cursor: grab;
+    user-select: none;
+    touch-action: none;
+}
+
+.status-group.is-dragging .status-group-handle {
+    cursor: grabbing;
+}
+
+.status-task-card {
+    cursor: pointer;
+}
+
+.status-task-card:active {
+    cursor: pointer;
+}
+
+.status-task-project {
+    display: inline-block;
+    font-size: 0.75rem;
+    color: var(--accent-color);
+    text-decoration: none;
+    margin-bottom: 0.4rem;
+}
+
+.status-task-project:hover {
+    text-decoration: underline;
+}
+
+.status-task-status {
+    display: block;
+    margin-top: 0.75rem;
+}
+
+.status-task-status .form-label {
+    margin-bottom: 0.25rem;
+}
+
+.status-task-status .form-control {
+    padding: 0.4rem 0.6rem;
+    font-size: 0.85rem;
+}
+
+.status-column-picker {
+    position: relative;
+}
+
+.status-column-picker .btn {
+    gap: 0.35rem;
+}
+
+.status-column-menu {
+    position: absolute;
+    top: calc(100% + 0.4rem);
+    right: 0;
+    width: min(18rem, calc(100vw - 2rem));
+    background: var(--bg-surface-hover);
+    border: 1px solid var(--card-border);
+    border-radius: 0.75rem;
+    box-shadow: var(--shadow-lg);
+    backdrop-filter: blur(12px);
+    z-index: 40;
+    padding: 0.5rem 0;
+}
+
+.status-column-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: 18rem;
+    overflow-y: auto;
+}
+
+.status-column-option {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.45rem 0.85rem;
+    cursor: pointer;
+    color: var(--text-primary);
+    font-size: 0.875rem;
+}
+
+.status-column-option:hover {
+    background: var(--card-bg);
+}
+
+.status-column-option-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.status-column-show-all {
+    width: calc(100% - 1rem);
+    margin: 0.35rem 0.5rem 0.15rem;
+}
+
 .main-content {
     flex: 1;
     display: flex;
@@ -189,6 +331,29 @@ h1, h2, h3, h4, h5, h6 {
     color: var(--text-primary);
 }
 
+.column-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.column-title-input {
+    flex: 1;
+    min-width: 0;
+    margin-right: 0.5rem;
+    padding: 0.3rem 0.5rem;
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.column-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    flex-shrink: 0;
+}
+
 .column-body {
     padding: 1rem;
     overflow-y: auto;
@@ -291,6 +456,8 @@ h1, h2, h3, h4, h5, h6 {
     border-radius: 1rem;
     width: 100%;
     max-width: 500px;
+    max-height: 90vh;
+    overflow: auto;
     padding: 2rem;
     box-shadow: var(--shadow-lg);
     animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
@@ -697,6 +864,25 @@ textarea.form-control {
 @media (max-width: 700px) {
     .task-side-grid {
         grid-template-columns: 1fr;
+    }
+
+    .app-header {
+        padding: 0.75rem 1rem;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+    }
+
+    .header-left {
+        gap: 0.85rem;
+    }
+
+    .header-nav {
+        gap: 0.75rem;
+    }
+
+    .column.status-group {
+        height: min(60vh, 520px);
+        max-height: min(60vh, 520px);
     }
 }
 

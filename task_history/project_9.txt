@@ -1,2 +1,2 @@
-2026-08-09 21:54:21 -> mokt -> phase 12 -> Moved from In Progress to Done
-2026-08-09 21:54:27 -> mokt -> pull out agent and harness communication logic use talktoharnesses -> Deleted task
+2026-08-13 20:13:01 -> mokt -> yolo mode -> Moved from planning to In Progress
+2026-08-13 20:13:01 -> mokt -> yolo mode -> Moved from In Progress to local review

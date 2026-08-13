@@ -1,3 +1,0 @@
-2026-08-09 10:06:10 -> mokt -> I want the "Register" button to open a dialog so I can select the project directory. -> Created in Backlog
-2026-08-09 10:06:48 -> mokt -> Reasoning effort option for Agent Configuration - non-openai -> Created in Backlog
-2026-08-09 10:07:17 -> mokt -> For OpenAI provider allow an option to pick the "flex" service type and remove the "LM backend path" form field -> Created in Backlog

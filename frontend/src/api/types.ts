@@ -62,6 +62,12 @@ export type BoardPayload = {
   history_content: string | null
 }
 
+export type StatusTask = Task & {
+  project: Project
+  columnName: string
+  projectColumns: ColumnName[]
+}
+
 export type ApiError = {
   detail: string
 }

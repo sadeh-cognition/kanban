@@ -104,6 +104,11 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ name }),
     }),
+  updateColumn: (columnId: number, name: string) =>
+    request<Column>(`/api/columns/${columnId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ name }),
+    }),
   deleteColumn: (columnId: number) =>
     request<void>(`/api/columns/${columnId}`, { method: 'DELETE' }),
   moveColumn: (columnId: number, newOrder: number) =>

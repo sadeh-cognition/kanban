@@ -18,7 +18,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { ApiClientError, api } from '../api/client'
 import type { Board, Column, Task } from '../api/types'
 import { useAuth } from '../auth/AuthContext'
@@ -149,6 +149,7 @@ function SortableColumn({
   column,
   onOpenTask,
   onCreateTask,
+  onRenameColumn,
   onDeleteColumn,
   onAssignToMe,
   currentUserId,
@@ -156,6 +157,7 @@ function SortableColumn({
   column: Column
   onOpenTask: (taskId: number) => void
   onCreateTask: (columnId: number) => void
+  onRenameColumn: (columnId: number, name: string) => Promise<void>
   onDeleteColumn: (columnId: number) => void
   onAssignToMe: (task: Task) => void
   currentUserId: number | null
@@ -168,6 +170,9 @@ function SortableColumn({
     transition,
     isDragging,
   } = useSortable({ id: columnId(column.id), data: { type: 'column', column } })
+  const [editing, setEditing] = useState(false)
+  const [draftName, setDraftName] = useState(column.name)
+  const skipSaveRef = useRef(false)
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -180,20 +185,98 @@ function SortableColumn({
     [column.tasks],
   )
 
+  function startEditing() {
+    skipSaveRef.current = false
+    setDraftName(column.name)
+    setEditing(true)
+  }
+
+  function cancelEditing() {
+    skipSaveRef.current = true
+    setDraftName(column.name)
+    setEditing(false)
+  }
+
+  async function saveName() {
+    if (skipSaveRef.current) {
+      skipSaveRef.current = false
+      return
+    }
+    const name = draftName.trim()
+    if (!name || name === column.name) {
+      setEditing(false)
+      setDraftName(column.name)
+      return
+    }
+    await onRenameColumn(column.id, name)
+    setEditing(false)
+  }
+
   return (
     <div ref={setNodeRef} style={style} className="column">
-      <div className="column-header" {...attributes} {...listeners}>
-        <h3>{column.name}</h3>
-        <button
-          type="button"
-          className="btn btn-danger btn-sm"
-          onClick={(e) => {
-            e.stopPropagation()
-            onDeleteColumn(column.id)
-          }}
-        >
-          Delete
-        </button>
+      <div
+        className="column-header"
+        {...attributes}
+        {...(editing ? {} : listeners)}
+      >
+        {editing ? (
+          <input
+            className="form-control column-title-input"
+            value={draftName}
+            onChange={(event) => setDraftName(event.target.value)}
+            onPointerDown={(event) => event.stopPropagation()}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault()
+                event.currentTarget.blur()
+              }
+              if (event.key === 'Escape') {
+                event.preventDefault()
+                cancelEditing()
+              }
+            }}
+            onBlur={() => void saveName()}
+            aria-label="Column name"
+            autoFocus
+          />
+        ) : (
+          <h3
+            className="column-title"
+            title="Double-click to rename"
+            onDoubleClick={(event) => {
+              event.stopPropagation()
+              startEditing()
+            }}
+          >
+            {column.name}
+          </h3>
+        )}
+        <div className="column-header-actions">
+          {!editing && (
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={(event) => {
+                event.stopPropagation()
+                startEditing()
+              }}
+            >
+              Rename
+            </button>
+          )}
+          <button
+            type="button"
+            className="btn btn-danger btn-sm"
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation()
+              onDeleteColumn(column.id)
+            }}
+          >
+            Delete
+          </button>
+        </div>
       </div>
       <div className="column-body">
         <SortableContext items={taskIds} strategy={verticalListSortingStrategy}>
@@ -421,6 +504,19 @@ export function BoardCanvas({
     }
   }
 
+  async function onRenameColumn(id: number, name: string) {
+    try {
+      const updated = await api.updateColumn(id, name)
+      setColumns(
+        board.columns.map((column) =>
+          column.id === id ? { ...column, name: updated.name } : column,
+        ),
+      )
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'Failed to rename column')
+    }
+  }
+
   async function onDeleteColumn(id: number) {
     if (!window.confirm('Delete this column and its tasks?')) return
     await api.deleteColumn(id)
@@ -443,6 +539,7 @@ export function BoardCanvas({
               column={column}
               onOpenTask={onOpenTask}
               onCreateTask={onCreateTask}
+              onRenameColumn={(id, name) => onRenameColumn(id, name)}
               onDeleteColumn={(id) => void onDeleteColumn(id)}
               onAssignToMe={(task) => void assignToMe(task)}
               currentUserId={user?.id ?? null}

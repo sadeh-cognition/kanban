@@ -365,6 +365,22 @@ def create_column(
     return 201, _column_schema(column)
 
 
+@api.patch(
+    "/columns/{column_id}",
+    response={200: ColumnSchema, 400: MessageSchema},
+)
+def update_column(
+    request: HttpRequest, column_id: int, data: ColumnCreateSchema
+) -> tuple[int, ColumnSchema | MessageSchema]:
+    name = data.name.strip()
+    if not name:
+        return 400, MessageSchema(detail="Name is required.")
+    column = get_object_or_404(Column, id=column_id)
+    column.name = name
+    column.save()
+    return 200, _column_schema(column)
+
+
 @api.delete("/columns/{column_id}", response={204: None})
 def delete_column(request: HttpRequest, column_id: int) -> tuple[int, None]:
     column = get_object_or_404(Column, id=column_id)
