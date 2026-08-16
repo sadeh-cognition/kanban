@@ -764,22 +764,46 @@ textarea.form-control {
     color: var(--text-secondary);
 }
 
-.history-banner {
-    margin: 0 2rem 1.5rem;
-    padding: 1rem;
-    background: var(--bg-surface);
-    border-radius: 8px;
-    border: 1px solid var(--card-border);
+.board-page {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
 }
 
-.history-banner pre {
+.board-page-main {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.history-sidebar {
+    display: flex;
+    flex-direction: column;
+    flex: 0 0 22rem;
+    width: 22rem;
+    min-height: 0;
+    padding: 1.25rem;
+    background: var(--bg-surface);
+    border-left: 1px solid var(--card-border);
+}
+
+.history-sidebar .section-row {
+    flex-shrink: 0;
+    flex-wrap: wrap;
+}
+
+.history-sidebar pre {
     white-space: pre-wrap;
     font-family: monospace;
     background: rgba(0, 0, 0, 0.25);
     padding: 1rem;
     border-radius: 4px;
     border: 1px solid var(--card-border);
-    max-height: 200px;
+    flex: 1;
+    min-height: 0;
     overflow-y: auto;
     margin: 1rem 0 0;
     font-size: 0.9rem;
@@ -861,6 +885,10 @@ textarea.form-control {
     margin-top: 1rem;
 }
 
+.task-side-grid > :last-child {
+    grid-column: 1 / -1;
+}
+
 @media (max-width: 700px) {
     .task-side-grid {
         grid-template-columns: 1fr;
@@ -883,6 +911,18 @@ textarea.form-control {
     .column.status-group {
         height: min(60vh, 520px);
         max-height: min(60vh, 520px);
+    }
+
+    .board-page {
+        flex-direction: column;
+    }
+
+    .history-sidebar {
+        flex: 0 0 auto;
+        width: auto;
+        max-height: 40vh;
+        border-left: none;
+        border-top: 1px solid var(--card-border);
     }
 }
 
@@ -942,4 +982,9 @@ textarea.form-control {
 
 select.form-control {
     appearance: auto;
+}
+
+.form-control:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
 }

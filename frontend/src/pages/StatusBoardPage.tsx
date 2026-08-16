@@ -3,15 +3,16 @@ import { Link } from 'react-router-dom'
 import { api } from '../api/client'
 import type { BoardPayload, StatusTask, Tag } from '../api/types'
 import { Layout } from '../components/Layout'
-import { StatusColumnPicker } from '../components/StatusColumnPicker'
+import { StatusFilterPicker } from '../components/StatusColumnPicker'
 import { StatusGroupsCanvas } from '../components/StatusGroupsCanvas'
 import { TaskModal } from '../components/TaskModal'
 
-const HIDDEN_KEY = 'kanban.statusGroupHidden'
+const HIDDEN_COLUMNS_KEY = 'kanban.statusGroupHidden'
+const HIDDEN_PROJECTS_KEY = 'kanban.statusProjectHidden'
 
-function readHidden(): string[] {
+function readStringList(key: string): string[] {
   try {
-    const raw = localStorage.getItem(HIDDEN_KEY)
+    const raw = localStorage.getItem(key)
     if (!raw) return []
     const parsed: unknown = JSON.parse(raw)
     if (!Array.isArray(parsed)) return []
@@ -21,8 +22,8 @@ function readHidden(): string[] {
   }
 }
 
-function writeHidden(hidden: string[]) {
-  localStorage.setItem(HIDDEN_KEY, JSON.stringify(hidden))
+function writeStringList(key: string, values: string[]) {
+  localStorage.setItem(key, JSON.stringify(values))
 }
 
 function flattenBoards(payloads: BoardPayload[]): StatusTask[] {
@@ -77,7 +78,12 @@ export function StatusBoardPage() {
     projectId: number
     tags: Tag[]
   } | null>(null)
-  const [hidden, setHidden] = useState<string[]>(readHidden)
+  const [hiddenColumns, setHiddenColumns] = useState<string[]>(() =>
+    readStringList(HIDDEN_COLUMNS_KEY),
+  )
+  const [hiddenProjects, setHiddenProjects] = useState<string[]>(() =>
+    readStringList(HIDDEN_PROJECTS_KEY),
+  )
 
   const load = useCallback(async () => {
     const projects = await api.listProjects()
@@ -120,22 +126,58 @@ export function StatusBoardPage() {
     }
   }, [selected])
 
-  const groups = useMemo(() => groupByStatus(tasks), [tasks])
-  const hiddenSet = useMemo(() => new Set(hidden), [hidden])
+  const projectItems = useMemo(() => {
+    const counts = new Map<string, { name: string; count: number }>()
+    for (const task of tasks) {
+      const id = String(task.project.id)
+      const existing = counts.get(id)
+      if (existing) {
+        existing.count += 1
+      } else {
+        counts.set(id, { name: task.project.name, count: 1 })
+      }
+    }
+    return [...counts.entries()]
+      .map(([id, item]) => ({ id, name: item.name, count: item.count }))
+      .sort((left, right) =>
+        left.name.localeCompare(right.name, undefined, { sensitivity: 'base' }),
+      )
+  }, [tasks])
+
+  const visibleTasks = useMemo(() => {
+    if (hiddenProjects.length === 0) return tasks
+    const hiddenSet = new Set(hiddenProjects)
+    return tasks.filter((task) => !hiddenSet.has(String(task.project.id)))
+  }, [tasks, hiddenProjects])
+
+  const groups = useMemo(() => groupByStatus(visibleTasks), [visibleTasks])
+  const hiddenColumnSet = useMemo(() => new Set(hiddenColumns), [hiddenColumns])
   const visibleGroups = useMemo(
-    () => groups.filter((group) => !hiddenSet.has(group.name)),
-    [groups, hiddenSet],
+    () => groups.filter((group) => !hiddenColumnSet.has(group.name)),
+    [groups, hiddenColumnSet],
   )
 
-  function onHiddenChange(
-    next: string[] | ((prev: string[]) => string[]),
+  function persistHidden(
+    key: string,
+    setter: (value: string[] | ((prev: string[]) => string[])) => void,
   ) {
-    setHidden((prev) => {
-      const value = typeof next === 'function' ? next(prev) : next
-      writeHidden(value)
-      return value
-    })
+    return (next: string[] | ((prev: string[]) => string[])) => {
+      setter((prev) => {
+        const value = typeof next === 'function' ? next(prev) : next
+        writeStringList(key, value)
+        return value
+      })
+    }
   }
+
+  const onHiddenColumnsChange = persistHidden(
+    HIDDEN_COLUMNS_KEY,
+    setHiddenColumns,
+  )
+  const onHiddenProjectsChange = persistHidden(
+    HIDDEN_PROJECTS_KEY,
+    setHiddenProjects,
+  )
 
   async function onChangeStatus(task: StatusTask, columnId: number) {
     if (columnId === task.column_id) return
@@ -177,14 +219,26 @@ export function StatusBoardPage() {
     <Layout
       actions={
         tasks.length > 0 ? (
-          <StatusColumnPicker
-            columns={groups.map((group) => ({
-              name: group.name,
-              count: group.tasks.length,
-            }))}
-            hidden={hidden}
-            onChange={onHiddenChange}
-          />
+          <>
+            <StatusFilterPicker
+              label="Projects"
+              menuTitle="Projects"
+              items={projectItems}
+              hidden={hiddenProjects}
+              onChange={onHiddenProjectsChange}
+            />
+            <StatusFilterPicker
+              label="Columns"
+              menuTitle="Statuses"
+              items={groups.map((group) => ({
+                id: group.name,
+                name: group.name,
+                count: group.tasks.length,
+              }))}
+              hidden={hiddenColumns}
+              onChange={onHiddenColumnsChange}
+            />
+          </>
         ) : undefined
       }
     >
@@ -202,6 +256,20 @@ export function StatusBoardPage() {
             <p>Create a task on a project board to see it here.</p>
           </div>
         </div>
+      ) : visibleTasks.length === 0 ? (
+        <div className="page-pad">
+          <div className="empty-state">
+            <h3>No projects selected</h3>
+            <p>Choose at least one project in the Projects menu.</p>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => onHiddenProjectsChange([])}
+            >
+              Show all
+            </button>
+          </div>
+        </div>
       ) : visibleGroups.length === 0 ? (
         <div className="page-pad">
           <div className="empty-state">
@@ -210,7 +278,7 @@ export function StatusBoardPage() {
             <button
               type="button"
               className="btn btn-primary"
-              onClick={() => onHiddenChange([])}
+              onClick={() => onHiddenColumnsChange([])}
             >
               Show all
             </button>
@@ -235,6 +303,7 @@ export function StatusBoardPage() {
               ? projectTags.tags
               : []
           }
+          columns={selected.projectColumns}
           onClose={() => setSelected(null)}
           onChanged={load}
         />

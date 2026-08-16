@@ -1,20 +1,30 @@
 import { useEffect, useRef, useState } from 'react'
 
-type StatusColumnPickerProps = {
-  columns: { name: string; count: number }[]
+export type StatusFilterItem = {
+  id: string
+  name: string
+  count: number
+}
+
+type StatusFilterPickerProps = {
+  label: string
+  menuTitle: string
+  items: StatusFilterItem[]
   hidden: string[]
   onChange: (hidden: string[] | ((prev: string[]) => string[])) => void
 }
 
-export function StatusColumnPicker({
-  columns,
+export function StatusFilterPicker({
+  label,
+  menuTitle,
+  items,
   hidden,
   onChange,
-}: StatusColumnPickerProps) {
+}: StatusFilterPickerProps) {
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
   const hiddenSet = new Set(hidden)
-  const visibleCount = columns.filter((column) => !hiddenSet.has(column.name)).length
+  const visibleCount = items.filter((item) => !hiddenSet.has(item.id)).length
 
   useEffect(() => {
     if (!open) return
@@ -39,11 +49,9 @@ export function StatusColumnPicker({
     }
   }, [open])
 
-  function toggle(name: string) {
+  function toggle(id: string) {
     onChange((prev) =>
-      prev.includes(name)
-        ? prev.filter((item) => item !== name)
-        : [...prev, name],
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
     )
   }
 
@@ -56,27 +64,27 @@ export function StatusColumnPicker({
         aria-expanded={open}
         onClick={() => setOpen((prev) => !prev)}
       >
-        Columns ({visibleCount}/{columns.length})
+        {label} ({visibleCount}/{items.length})
         <span className="project-switcher-caret" aria-hidden="true">
           ▾
         </span>
       </button>
       {open && (
         <div className="status-column-menu" role="listbox" aria-multiselectable="true">
-          <p className="project-switcher-label">Statuses</p>
+          <p className="project-switcher-label">{menuTitle}</p>
           <ul className="status-column-list">
-            {columns.map((column) => {
-              const checked = !hiddenSet.has(column.name)
+            {items.map((item) => {
+              const checked = !hiddenSet.has(item.id)
               return (
-                <li key={column.name}>
+                <li key={item.id}>
                   <label className="status-column-option">
                     <input
                       type="checkbox"
                       checked={checked}
-                      onChange={() => toggle(column.name)}
+                      onChange={() => toggle(item.id)}
                     />
-                    <span className="status-column-option-name">{column.name}</span>
-                    <span className="muted-meta">{column.count}</span>
+                    <span className="status-column-option-name">{item.name}</span>
+                    <span className="muted-meta">{item.count}</span>
                   </label>
                 </li>
               )

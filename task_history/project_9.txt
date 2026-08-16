@@ -1,2 +1,2 @@
-2026-08-13 20:13:01 -> mokt -> yolo mode -> Moved from planning to In Progress
-2026-08-13 20:13:01 -> mokt -> yolo mode -> Moved from In Progress to local review
+2026-08-14 22:35:36 -> mokt -> Better error on harness version incompatibility -> Moved from PR review to Done
+2026-08-14 22:35:41 -> mokt -> Is it possible to pick the reasoning level? -> Moved from To Do to Done

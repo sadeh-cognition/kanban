@@ -122,36 +122,40 @@ export function BoardPage() {
         </>
       }
     >
-      <div className="board-header">
-        <p className="breadcrumb">
-          <Link to="/">Projects</Link> / {payload.project.name}
-        </p>
-        <h2>{payload.board.name}</h2>
-      </div>
-
-      {payload.history_content && (
-        <div className="history-banner">
-          <div className="section-row">
-            <h3>Unreviewed Task History</h3>
-            <button
-              type="button"
-              className="btn btn-danger btn-sm"
-              onClick={() => void markHistoryReviewed()}
-            >
-              Mark as Reviewed (Delete)
-            </button>
+      <div className="board-page">
+        <div className="board-page-main">
+          <div className="board-header">
+            <p className="breadcrumb">
+              <Link to="/">Projects</Link> / {payload.project.name}
+            </p>
+            <h2>{payload.board.name}</h2>
           </div>
-          <pre>{payload.history_content}</pre>
-        </div>
-      )}
 
-      <BoardCanvas
-        board={payload.board}
-        onBoardChange={onBoardChange}
-        onOpenTask={setSelectedTaskId}
-        onCreateTask={setCreateTaskColumnId}
-        onError={(message) => void onError(message)}
-      />
+          <BoardCanvas
+            board={payload.board}
+            onBoardChange={onBoardChange}
+            onOpenTask={setSelectedTaskId}
+            onCreateTask={setCreateTaskColumnId}
+            onError={(message) => void onError(message)}
+          />
+        </div>
+
+        {payload.history_content && (
+          <aside className="history-sidebar">
+            <div className="section-row">
+              <h3>Unreviewed Task History</h3>
+              <button
+                type="button"
+                className="btn btn-danger btn-sm"
+                onClick={() => void markHistoryReviewed()}
+              >
+                Mark as Reviewed (Delete)
+              </button>
+            </div>
+            <pre>{payload.history_content}</pre>
+          </aside>
+        )}
+      </div>
 
       {toast && <div className="toast toast-error">{toast}</div>}
 
@@ -276,6 +280,7 @@ export function BoardPage() {
         <TaskModal
           taskId={selectedTaskId}
           projectTags={tags}
+          columns={payload.board.columns}
           onClose={() => setSelectedTaskId(null)}
           onChanged={load}
         />

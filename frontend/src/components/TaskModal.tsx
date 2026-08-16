@@ -1,12 +1,13 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { api } from '../api/client'
-import type { Tag, TaskDetail, User } from '../api/types'
+import type { ColumnName, Tag, TaskDetail, User } from '../api/types'
 import { useAuth } from '../auth/AuthContext'
 import { Modal } from './Modal'
 
 type TaskModalProps = {
   taskId: number
   projectTags: Tag[]
+  columns: ColumnName[]
   onClose: () => void
   onChanged: () => Promise<void>
 }
@@ -14,6 +15,7 @@ type TaskModalProps = {
 export function TaskModal({
   taskId,
   projectTags,
+  columns,
   onClose,
   onChanged,
 }: TaskModalProps) {
@@ -27,6 +29,7 @@ export function TaskModal({
   const [detailsDirty, setDetailsDirty] = useState(false)
   const [assignDirty, setAssignDirty] = useState(false)
   const [tagsDirty, setTagsDirty] = useState(false)
+  const [statusPending, setStatusPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -93,6 +96,21 @@ export function TaskModal({
     }
   }
 
+  async function changeStatus(columnId: number) {
+    if (!task || columnId === task.column_id) return
+    setError(null)
+    setStatusPending(true)
+    try {
+      await api.moveTask(taskId, columnId, 10_000)
+      await onChanged()
+      setTask(await api.getTask(taskId))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to change status')
+    } finally {
+      setStatusPending(false)
+    }
+  }
+
   async function onDelete() {
     if (!window.confirm('Delete this task?')) return
     await api.deleteTask(taskId)
@@ -149,6 +167,30 @@ export function TaskModal({
       </form>
 
       <div className="task-side-grid">
+        <div>
+          <h3 className="section-title">Status</h3>
+          <select
+            className="form-control"
+            value={task.column_id}
+            disabled={!task.assigned_to || statusPending}
+            title={
+              task.assigned_to
+                ? undefined
+                : 'Assign the task before changing status'
+            }
+            onChange={(e) => void changeStatus(Number(e.target.value))}
+          >
+            {columns.map((column) => (
+              <option key={column.id} value={column.id}>
+                {column.name}
+              </option>
+            ))}
+          </select>
+          {!task.assigned_to && (
+            <p className="muted-meta">Assign the task before changing status</p>
+          )}
+        </div>
+
         <form onSubmit={(e) => void saveAssignment(e)}>
           <div className="section-row">
             <h3 className="section-title">Assignee</h3>
