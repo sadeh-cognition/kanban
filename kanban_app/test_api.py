@@ -5,7 +5,15 @@ from django.contrib.auth import get_user_model
 from django.test import Client
 from model_bakery import baker
 
-from kanban_app.models import Board, Column, Project, Tag, Task, TaskAssignmentHistory
+from kanban_app.models import (
+    Board,
+    Column,
+    Project,
+    Tag,
+    Task,
+    TaskAssignmentHistory,
+    TaskUpdate,
+)
 
 User = get_user_model()
 
@@ -80,8 +88,49 @@ def test_list_and_create_project(auth_client: Client) -> None:
         content_type="application/json",
     )
     assert created.status_code == 201
-    assert _json(created)["name"] == "New Project"
+    payload = _json(created)
+    assert payload["name"] == "New Project"
+    assert payload["github_url"] == ""
     assert Project.objects.filter(name="New Project").exists()
+
+
+@pytest.mark.django_db
+def test_set_project_github_url(auth_client: Client) -> None:
+    project = baker.make(Project, name="Linked")
+    created = auth_client.post(
+        "/api/projects",
+        data=json.dumps(
+            {
+                "name": "With Link",
+                "github_url": "github.com/sadeh-congnition/kanban",
+            }
+        ),
+        content_type="application/json",
+    )
+    assert created.status_code == 201
+    assert _json(created)["github_url"] == "https://github.com/sadeh-congnition/kanban"
+
+    updated = auth_client.patch(
+        f"/api/projects/{project.id}",
+        data=json.dumps({"github_url": "https://github.com/example/repo"}),
+        content_type="application/json",
+    )
+    assert updated.status_code == 200
+    assert _json(updated)["github_url"] == "https://github.com/example/repo"
+    project.refresh_from_db()
+    assert project.github_url == "https://github.com/example/repo"
+
+    listed = auth_client.get("/api/projects")
+    by_id = {p["id"]: p for p in _json(listed)}
+    assert by_id[project.id]["github_url"] == "https://github.com/example/repo"
+
+    bad = auth_client.patch(
+        f"/api/projects/{project.id}",
+        data=json.dumps({"github_url": "not a url"}),
+        content_type="application/json",
+    )
+    assert bad.status_code == 400
+    assert _json(bad)["detail"] == "Enter a valid URL."
 
 
 @pytest.mark.django_db
@@ -294,6 +343,48 @@ def test_task_assignment(auth_client: Client) -> None:
     assert TaskAssignmentHistory.objects.filter(
         task=task, old_assignee=user2, new_assignee=None
     ).exists()
+
+
+@pytest.mark.django_db
+def test_add_task_update(auth_client: Client, user: User) -> None:
+    project = baker.make(Project)
+    board = baker.make(Board, project=project)
+    col = baker.make(Column, board=board, order=0)
+    task = baker.make(Task, column=col, order=0, title="Needs notes")
+
+    empty = auth_client.post(
+        f"/api/tasks/{task.id}/updates",
+        data=json.dumps({"body": "   "}),
+        content_type="application/json",
+    )
+    assert empty.status_code == 400
+    assert _json(empty)["detail"] == "Update cannot be empty."
+    assert TaskUpdate.objects.count() == 0
+
+    response = auth_client.post(
+        f"/api/tasks/{task.id}/updates",
+        data=json.dumps({"body": "  Talked to design  "}),
+        content_type="application/json",
+    )
+    assert response.status_code == 201
+    payload = _json(response)
+    updates = [entry for entry in payload["history"] if entry["type"] == "update"]
+    assert len(updates) == 1
+    assert payload["history"][0]["type"] == "update"
+    assert updates[0]["body"] == "Talked to design"
+    assert updates[0]["author"]["username"] == user.username
+
+    stored = TaskUpdate.objects.get(task=task)
+    assert stored.body == "Talked to design"
+    assert stored.author == user
+
+    details = auth_client.get(f"/api/tasks/{task.id}")
+    assert details.status_code == 200
+    history = _json(details)["history"]
+    assert any(
+        entry["type"] == "update" and entry["body"] == "Talked to design"
+        for entry in history
+    )
 
 
 @pytest.mark.django_db

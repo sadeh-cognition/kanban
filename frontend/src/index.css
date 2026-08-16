@@ -231,6 +231,11 @@ h1, h2, h3, h4, h5, h6 {
     font-size: 2rem;
 }
 
+.board-header .project-github,
+.board-header > .project-github-action {
+    margin: 0 0 0.75rem;
+}
+
 /* Buttons */
 .btn {
     display: inline-flex;
@@ -705,6 +710,31 @@ textarea.form-control {
     font-size: 1.25rem;
 }
 
+.project-github {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+}
+
+.project-github-link {
+    pointer-events: auto;
+    color: var(--accent-color);
+    text-decoration: none;
+    font-size: 0.85rem;
+    word-break: break-all;
+}
+
+.project-github-link:hover {
+    text-decoration: underline;
+}
+
+.project-github-action {
+    pointer-events: auto;
+    padding: 0;
+    font-size: 0.8rem;
+}
+
 .project-delete {
     pointer-events: auto;
 }
@@ -961,6 +991,20 @@ textarea.form-control {
 
 .history-dot.assignment {
     background-color: #10b981;
+}
+
+.history-dot.update {
+    background-color: #f59e0b;
+}
+
+.update-form {
+    margin-bottom: 1rem;
+}
+
+.history-update-body {
+    margin-top: 0.35rem;
+    white-space: pre-wrap;
+    color: var(--text-secondary);
 }
 
 .toast {

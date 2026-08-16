@@ -81,10 +81,15 @@ export const api = {
   me: () => request<User>('/api/auth/me'),
   listUsers: () => request<User[]>('/api/users'),
   listProjects: () => request<Project[]>('/api/projects'),
-  createProject: (name: string) =>
+  createProject: (name: string, githubUrl = '') =>
     request<Project>('/api/projects', {
       method: 'POST',
-      body: JSON.stringify({ name }),
+      body: JSON.stringify({ name, github_url: githubUrl }),
+    }),
+  updateProject: (id: number, githubUrl: string) =>
+    request<Project>(`/api/projects/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ github_url: githubUrl }),
     }),
   deleteProject: (id: number) =>
     request<void>(`/api/projects/${id}`, { method: 'DELETE' }),
@@ -149,6 +154,11 @@ export const api = {
     request<Task>(`/api/tasks/${taskId}/assign`, {
       method: 'POST',
       body: JSON.stringify({ user_id: userId }),
+    }),
+  addTaskUpdate: (taskId: number, body: string) =>
+    request<TaskDetail>(`/api/tasks/${taskId}/updates`, {
+      method: 'POST',
+      body: JSON.stringify({ body }),
     }),
   deleteHistory: (projectId: number) =>
     request<void>(`/api/projects/${projectId}/history`, { method: 'DELETE' }),

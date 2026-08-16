@@ -13,6 +13,7 @@ class ActiveProjectManager(models.Manager):
 
 class Project(models.Model):
     name = models.CharField(max_length=255)
+    github_url = models.URLField(max_length=500, blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     is_deleted = models.BooleanField(default=False)
@@ -123,3 +124,18 @@ class TaskAssignmentHistory(models.Model):
 
     def __str__(self):
         return f"{self.task.title} assigned from {self.old_assignee} to {self.new_assignee} at {self.changed_at}"
+
+
+class TaskUpdate(models.Model):
+    task = models.ForeignKey(Task, related_name="updates", on_delete=models.CASCADE)
+    author = models.ForeignKey(
+        User, related_name="+", on_delete=models.SET_NULL, null=True, blank=True
+    )
+    body = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Update on {self.task.title} at {self.created_at}"

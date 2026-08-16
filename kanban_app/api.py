@@ -2,6 +2,8 @@ import os
 from datetime import datetime
 
 from django.contrib.auth import authenticate, get_user_model, login, logout
+from django.core.exceptions import ValidationError
+from django.core.validators import URLValidator
 from django.db import transaction
 from django.contrib.auth.models import AbstractBaseUser
 from django.http import HttpRequest
@@ -19,6 +21,7 @@ from .models import (
     Task,
     TaskAssignmentHistory,
     TaskStatusHistory,
+    TaskUpdate,
 )
 
 User = get_user_model()
@@ -46,10 +49,16 @@ class LoginSchema(Schema):
 class ProjectSchema(Schema):
     id: int
     name: str
+    github_url: str
 
 
 class ProjectCreateSchema(Schema):
     name: str
+    github_url: str = ""
+
+
+class ProjectUpdateSchema(Schema):
+    github_url: str
 
 
 class TagSchema(Schema):
@@ -95,6 +104,10 @@ class TaskAssignSchema(Schema):
     user_id: int | None = None
 
 
+class TaskUpdateCreateSchema(Schema):
+    body: str
+
+
 class ColumnNameSchema(Schema):
     id: int
     name: str
@@ -107,6 +120,8 @@ class HistoryEntrySchema(Schema):
     new_column: ColumnNameSchema | None = None
     old_assignee: UserSchema | None = None
     new_assignee: UserSchema | None = None
+    body: str | None = None
+    author: UserSchema | None = None
 
 
 class TaskSchema(Schema):
@@ -152,6 +167,27 @@ class CsrfSchema(Schema):
 
 
 # --- Helpers ---
+
+
+def _normalize_github_url(value: str) -> tuple[str, str | None]:
+    url = value.strip()
+    if not url:
+        return "", None
+    if not url.startswith(("http://", "https://")):
+        url = f"https://{url}"
+    try:
+        URLValidator()(url)
+    except ValidationError:
+        return "", "Enter a valid URL."
+    return url, None
+
+
+def _project_schema(project: Project) -> ProjectSchema:
+    return ProjectSchema(
+        id=project.id,
+        name=project.name,
+        github_url=project.github_url,
+    )
 
 
 def _user_schema(user: AbstractBaseUser | None) -> UserSchema | None:
@@ -241,7 +277,16 @@ def _task_history(task: Task) -> list[HistoryEntrySchema]:
                 new_assignee=_user_schema(entry.new_assignee),
             )
         )
-    history.sort(key=lambda item: item.changed_at)
+    for entry in task.updates.select_related("author").all():
+        history.append(
+            HistoryEntrySchema(
+                type="update",
+                changed_at=entry.created_at,
+                body=entry.body,
+                author=_user_schema(entry.author),
+            )
+        )
+    history.sort(key=lambda item: item.changed_at, reverse=True)
     return history
 
 
@@ -297,15 +342,34 @@ def list_users(request: HttpRequest) -> list[UserSchema]:
 
 @api.get("/projects", response=list[ProjectSchema])
 def list_projects(request: HttpRequest) -> list[ProjectSchema]:
-    return [ProjectSchema(id=p.id, name=p.name) for p in Project.objects.all()]
+    return [_project_schema(p) for p in Project.objects.all()]
 
 
-@api.post("/projects", response={201: ProjectSchema})
+@api.post("/projects", response={201: ProjectSchema, 400: MessageSchema})
 def create_project(
     request: HttpRequest, data: ProjectCreateSchema
-) -> tuple[int, ProjectSchema]:
-    project = Project.objects.create(name=data.name)
-    return 201, ProjectSchema(id=project.id, name=project.name)
+) -> tuple[int, ProjectSchema | MessageSchema]:
+    github_url, error = _normalize_github_url(data.github_url)
+    if error:
+        return 400, MessageSchema(detail=error)
+    project = Project.objects.create(name=data.name, github_url=github_url)
+    return 201, _project_schema(project)
+
+
+@api.patch(
+    "/projects/{project_id}",
+    response={200: ProjectSchema, 400: MessageSchema},
+)
+def update_project(
+    request: HttpRequest, project_id: int, data: ProjectUpdateSchema
+) -> tuple[int, ProjectSchema | MessageSchema]:
+    project = get_object_or_404(Project, id=project_id)
+    github_url, error = _normalize_github_url(data.github_url)
+    if error:
+        return 400, MessageSchema(detail=error)
+    project.github_url = github_url
+    project.save()
+    return 200, _project_schema(project)
 
 
 @api.delete("/projects/{project_id}", response={204: None})
@@ -320,7 +384,7 @@ def get_project_board(request: HttpRequest, project_id: int) -> BoardPayloadSche
     project = get_object_or_404(Project, id=project_id)
     board = _ensure_board(project)
     return BoardPayloadSchema(
-        project=ProjectSchema(id=project.id, name=project.name),
+        project=_project_schema(project),
         board=_board_schema(board),
         history_content=_read_history_content(project_id),
     )
@@ -565,6 +629,35 @@ def assign_task(
 
     task = Task.objects.prefetch_related("tags", "assigned_to").get(id=task.id)
     return _task_schema(task)
+
+
+@api.post(
+    "/tasks/{task_id}/updates",
+    response={201: TaskDetailSchema, 400: MessageSchema},
+)
+def create_task_update(
+    request: HttpRequest, task_id: int, data: TaskUpdateCreateSchema
+) -> tuple[int, TaskDetailSchema | MessageSchema]:
+    body = data.body.strip()
+    if not body:
+        return 400, MessageSchema(detail="Update cannot be empty.")
+
+    task = get_object_or_404(
+        Task.objects.prefetch_related("tags", "assigned_to"), id=task_id
+    )
+    author = request.user if request.user.is_authenticated else None
+    TaskUpdate.objects.create(task=task, author=author, body=body)
+
+    preview = body if len(body) <= 80 else f"{body[:77]}..."
+    log_task_change(
+        task.column.board.project_id,
+        _actor_name(request),
+        task.title,
+        f"Added update: {preview}",
+    )
+
+    base = _task_schema(task)
+    return 201, TaskDetailSchema(**base.model_dump(), history=_task_history(task))
 
 
 # --- History ---

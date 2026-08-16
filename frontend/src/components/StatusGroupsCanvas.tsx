@@ -14,6 +14,7 @@ type StatusGroupsCanvasProps = {
   pendingTaskIds: Set<number>
   onChangeStatus: (task: StatusTask, columnId: number) => void
   onOpenTask: (task: StatusTask) => void
+  onAddUpdate: (task: StatusTask) => void
 }
 
 const STORAGE_KEY = 'kanban.statusGroupPositions.v2'
@@ -97,6 +98,7 @@ export function StatusGroupsCanvas({
   pendingTaskIds,
   onChangeStatus,
   onOpenTask,
+  onAddUpdate,
 }: StatusGroupsCanvasProps) {
   const [positions, setPositions] = useState<Record<string, Position>>(readPositions)
   const [zOrder, setZOrder] = useState<Record<string, number>>({})
@@ -237,6 +239,7 @@ export function StatusGroupsCanvas({
                     pending={pendingTaskIds.has(task.id)}
                     onChangeStatus={onChangeStatus}
                     onOpen={() => onOpenTask(task)}
+                    onAddUpdate={() => onAddUpdate(task)}
                   />
                 ))}
               </div>
@@ -253,11 +256,13 @@ function StatusTaskCard({
   pending,
   onChangeStatus,
   onOpen,
+  onAddUpdate,
 }: {
   task: StatusTask
   pending: boolean
   onChangeStatus: (task: StatusTask, columnId: number) => void
   onOpen: () => void
+  onAddUpdate: () => void
 }) {
   const assigned = task.assigned_to != null
 
@@ -294,6 +299,18 @@ function StatusTaskCard({
         {task.assigned_to && (
           <span className="assignee-chip">{task.assigned_to.username}</span>
         )}
+      </div>
+      <div className="task-actions">
+        <button
+          type="button"
+          className="btn btn-sm btn-ghost"
+          onClick={(event) => {
+            event.stopPropagation()
+            onAddUpdate()
+          }}
+        >
+          Update
+        </button>
       </div>
       <label
         className="status-task-status"

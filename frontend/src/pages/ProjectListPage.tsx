@@ -4,12 +4,14 @@ import { api } from '../api/client'
 import type { Project } from '../api/types'
 import { Layout } from '../components/Layout'
 import { Modal } from '../components/Modal'
+import { ProjectGithubLink } from '../components/ProjectGithubLink'
 
 export function ProjectListPage() {
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
   const [name, setName] = useState('')
+  const [githubUrl, setGithubUrl] = useState('')
   const [error, setError] = useState<string | null>(null)
 
   async function load() {
@@ -29,8 +31,9 @@ export function ProjectListPage() {
     e.preventDefault()
     setError(null)
     try {
-      await api.createProject(name.trim())
+      await api.createProject(name.trim(), githubUrl.trim())
       setName('')
+      setGithubUrl('')
       setShowCreate(false)
       await load()
     } catch (err) {
@@ -91,6 +94,16 @@ export function ProjectListPage() {
                 <div className="project-card-body">
                   <div>
                     <h3>{project.name}</h3>
+                    <ProjectGithubLink
+                      project={project}
+                      onUpdated={(updated) =>
+                        setProjects((prev) =>
+                          prev.map((item) =>
+                            item.id === updated.id ? updated : item,
+                          ),
+                        )
+                      }
+                    />
                   </div>
                   <button
                     type="button"
@@ -122,6 +135,18 @@ export function ProjectListPage() {
                 onChange={(e) => setName(e.target.value)}
                 required
                 autoFocus
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label" htmlFor="project-github">
+                GitHub URL
+              </label>
+              <input
+                id="project-github"
+                className="form-control"
+                value={githubUrl}
+                onChange={(e) => setGithubUrl(e.target.value)}
+                placeholder="https://github.com/org/repo"
               />
             </div>
             <div className="form-actions">

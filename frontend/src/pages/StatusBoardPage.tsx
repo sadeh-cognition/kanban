@@ -6,6 +6,7 @@ import { Layout } from '../components/Layout'
 import { StatusFilterPicker } from '../components/StatusColumnPicker'
 import { StatusGroupsCanvas } from '../components/StatusGroupsCanvas'
 import { TaskModal } from '../components/TaskModal'
+import { TaskUpdateModal } from '../components/TaskUpdateModal'
 
 const HIDDEN_COLUMNS_KEY = 'kanban.statusGroupHidden'
 const HIDDEN_PROJECTS_KEY = 'kanban.statusProjectHidden'
@@ -74,6 +75,7 @@ export function StatusBoardPage() {
   const [toast, setToast] = useState<string | null>(null)
   const [pendingTaskIds, setPendingTaskIds] = useState<Set<number>>(new Set())
   const [selected, setSelected] = useState<StatusTask | null>(null)
+  const [updateTask, setUpdateTask] = useState<StatusTask | null>(null)
   const [projectTags, setProjectTags] = useState<{
     projectId: number
     tags: Tag[]
@@ -290,6 +292,7 @@ export function StatusBoardPage() {
           pendingTaskIds={pendingTaskIds}
           onChangeStatus={(task, columnId) => void onChangeStatus(task, columnId)}
           onOpenTask={setSelected}
+          onAddUpdate={setUpdateTask}
         />
       )}
 
@@ -306,6 +309,15 @@ export function StatusBoardPage() {
           columns={selected.projectColumns}
           onClose={() => setSelected(null)}
           onChanged={load}
+        />
+      )}
+
+      {updateTask !== null && (
+        <TaskUpdateModal
+          taskId={updateTask.id}
+          taskTitle={updateTask.title}
+          onClose={() => setUpdateTask(null)}
+          onSaved={load}
         />
       )}
     </Layout>

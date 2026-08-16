@@ -5,8 +5,10 @@ import type { Board, BoardPayload, Tag } from '../api/types'
 import { BoardCanvas } from '../components/BoardCanvas'
 import { Layout } from '../components/Layout'
 import { Modal } from '../components/Modal'
+import { ProjectGithubLink } from '../components/ProjectGithubLink'
 import { TagsModal } from '../components/TagsModal'
 import { TaskModal } from '../components/TaskModal'
+import { TaskUpdateModal } from '../components/TaskUpdateModal'
 
 export function BoardPage() {
   const { projectId } = useParams()
@@ -25,6 +27,7 @@ export function BoardPage() {
   const [taskDescription, setTaskDescription] = useState('')
   const [taskTagIds, setTaskTagIds] = useState<number[]>([])
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null)
+  const [updateTaskId, setUpdateTaskId] = useState<number | null>(null)
 
   const load = useCallback(async () => {
     const boardPayload = await api.getBoard(id)
@@ -128,6 +131,14 @@ export function BoardPage() {
             <p className="breadcrumb">
               <Link to="/">Projects</Link> / {payload.project.name}
             </p>
+            <ProjectGithubLink
+              project={payload.project}
+              onUpdated={(updated) =>
+                setPayload((prev) =>
+                  prev ? { ...prev, project: updated } : prev,
+                )
+              }
+            />
             <h2>{payload.board.name}</h2>
           </div>
 
@@ -135,6 +146,7 @@ export function BoardPage() {
             board={payload.board}
             onBoardChange={onBoardChange}
             onOpenTask={setSelectedTaskId}
+            onAddUpdate={setUpdateTaskId}
             onCreateTask={setCreateTaskColumnId}
             onError={(message) => void onError(message)}
           />
@@ -283,6 +295,19 @@ export function BoardPage() {
           columns={payload.board.columns}
           onClose={() => setSelectedTaskId(null)}
           onChanged={load}
+        />
+      )}
+
+      {updateTaskId !== null && (
+        <TaskUpdateModal
+          taskId={updateTaskId}
+          taskTitle={
+            payload.board.columns
+              .flatMap((column) => column.tasks)
+              .find((task) => task.id === updateTaskId)?.title
+          }
+          onClose={() => setUpdateTaskId(null)}
+          onSaved={load}
         />
       )}
     </Layout>

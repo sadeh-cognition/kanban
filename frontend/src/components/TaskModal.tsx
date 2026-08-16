@@ -30,6 +30,9 @@ export function TaskModal({
   const [assignDirty, setAssignDirty] = useState(false)
   const [tagsDirty, setTagsDirty] = useState(false)
   const [statusPending, setStatusPending] = useState(false)
+  const [showUpdateForm, setShowUpdateForm] = useState(false)
+  const [updateBody, setUpdateBody] = useState('')
+  const [updatePending, setUpdatePending] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -108,6 +111,25 @@ export function TaskModal({
       setError(err instanceof Error ? err.message : 'Failed to change status')
     } finally {
       setStatusPending(false)
+    }
+  }
+
+  async function saveUpdate(e: FormEvent) {
+    e.preventDefault()
+    const body = updateBody.trim()
+    if (!body) return
+    setError(null)
+    setUpdatePending(true)
+    try {
+      const updated = await api.addTaskUpdate(taskId, body)
+      setUpdateBody('')
+      setShowUpdateForm(false)
+      setTask(updated)
+      await onChanged()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save update')
+    } finally {
+      setUpdatePending(false)
     }
   }
 
@@ -275,15 +297,61 @@ export function TaskModal({
         </form>
       </div>
 
-      {task.history.length > 0 && (
-        <div className="history-block">
+      <div className="history-block">
+        <div className="section-row">
           <h3 className="section-title">Change History</h3>
+          {!showUpdateForm && (
+            <button
+              type="button"
+              className="btn btn-sm btn-primary"
+              onClick={() => setShowUpdateForm(true)}
+            >
+              Update
+            </button>
+          )}
+        </div>
+        {showUpdateForm && (
+          <form onSubmit={(e) => void saveUpdate(e)} className="update-form">
+            <div className="form-group">
+              <label className="form-label" htmlFor="task-update-body">
+                Update
+              </label>
+              <textarea
+                id="task-update-body"
+                className="form-control"
+                value={updateBody}
+                onChange={(e) => setUpdateBody(e.target.value)}
+                placeholder="What happened?"
+                autoFocus
+                required
+              />
+            </div>
+            <div className="form-actions">
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => {
+                  setShowUpdateForm(false)
+                  setUpdateBody('')
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={updatePending || !updateBody.trim()}
+              >
+                Save Update
+              </button>
+            </div>
+          </form>
+        )}
+        {task.history.length > 0 && (
           <div className="history-timeline">
             {task.history.map((event, idx) => (
               <div key={`${event.type}-${event.changed_at}-${idx}`} className="history-item">
-                <div
-                  className={`history-dot ${event.type === 'status' ? 'status' : 'assignment'}`}
-                />
+                <div className={`history-dot ${event.type}`} />
                 <p className="muted-meta">
                   {new Date(event.changed_at).toLocaleString()}
                 </p>
@@ -293,18 +361,27 @@ export function TaskModal({
                       ? `Moved from ${event.old_column.name} to ${event.new_column?.name ?? ''}`
                       : `Created in ${event.new_column?.name ?? ''}`}
                   </p>
-                ) : (
+                ) : event.type === 'assignment' ? (
                   <p>
                     Assigned from{' '}
                     {event.old_assignee?.username ?? 'Unassigned'} to{' '}
                     {event.new_assignee?.username ?? 'Unassigned'}
                   </p>
+                ) : (
+                  <>
+                    <p>
+                      Update from {event.author?.username ?? 'Unknown'}
+                    </p>
+                    {event.body && (
+                      <p className="history-update-body">{event.body}</p>
+                    )}
+                  </>
                 )}
               </div>
             ))}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       <div className="form-actions">
         <button type="button" className="btn btn-danger" onClick={() => void onDelete()}>

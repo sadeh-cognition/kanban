@@ -6,6 +6,7 @@ export type User = {
 export type Project = {
   id: number
   name: string
+  github_url: string
 }
 
 export type Tag = {
@@ -31,12 +32,14 @@ export type ColumnName = {
 }
 
 export type HistoryEntry = {
-  type: 'status' | 'assignment' | string
+  type: 'status' | 'assignment' | 'update' | string
   changed_at: string
   old_column?: ColumnName | null
   new_column?: ColumnName | null
   old_assignee?: User | null
   new_assignee?: User | null
+  body?: string | null
+  author?: User | null
 }
 
 export type TaskDetail = Task & {

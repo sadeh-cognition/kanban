@@ -27,6 +27,7 @@ type BoardCanvasProps = {
   board: Board
   onBoardChange: (board: Board) => void
   onOpenTask: (taskId: number) => void
+  onAddUpdate: (taskId: number) => void
   onCreateTask: (columnId: number) => void
   onError: (message: string) => void
 }
@@ -68,11 +69,13 @@ function TaskCardView({
   onOpen,
   dragging,
   onAssignToMe,
+  onAddUpdate,
 }: {
   task: Task
   onOpen?: () => void
   dragging?: boolean
   onAssignToMe?: () => void
+  onAddUpdate?: () => void
 }) {
   return (
     <div
@@ -101,19 +104,34 @@ function TaskCardView({
           <span className="assignee-chip">{task.assigned_to.username}</span>
         )}
       </div>
-      {onAssignToMe && (
+      {(onAssignToMe || onAddUpdate) && (
         <div className="task-actions">
-          <button
-            type="button"
-            className="btn btn-sm btn-ghost"
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={(e) => {
-              e.stopPropagation()
-              onAssignToMe()
-            }}
-          >
-            Assign to me
-          </button>
+          {onAddUpdate && (
+            <button
+              type="button"
+              className="btn btn-sm btn-ghost"
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation()
+                onAddUpdate()
+              }}
+            >
+              Update
+            </button>
+          )}
+          {onAssignToMe && (
+            <button
+              type="button"
+              className="btn btn-sm btn-ghost"
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation()
+                onAssignToMe()
+              }}
+            >
+              Assign to me
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -124,10 +142,12 @@ function SortableTask({
   task,
   onOpen,
   onAssignToMe,
+  onAddUpdate,
 }: {
   task: Task
   onOpen: () => void
   onAssignToMe?: () => void
+  onAddUpdate?: () => void
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: taskId(task.id), data: { type: 'task', task } })
@@ -140,7 +160,12 @@ function SortableTask({
 
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
-      <TaskCardView task={task} onOpen={onOpen} onAssignToMe={onAssignToMe} />
+      <TaskCardView
+        task={task}
+        onOpen={onOpen}
+        onAssignToMe={onAssignToMe}
+        onAddUpdate={onAddUpdate}
+      />
     </div>
   )
 }
@@ -152,6 +177,7 @@ function SortableColumn({
   onRenameColumn,
   onDeleteColumn,
   onAssignToMe,
+  onAddUpdate,
   currentUserId,
 }: {
   column: Column
@@ -160,6 +186,7 @@ function SortableColumn({
   onRenameColumn: (columnId: number, name: string) => Promise<void>
   onDeleteColumn: (columnId: number) => void
   onAssignToMe: (task: Task) => void
+  onAddUpdate: (taskId: number) => void
   currentUserId: number | null
 }) {
   const {
@@ -285,6 +312,7 @@ function SortableColumn({
               key={task.id}
               task={task}
               onOpen={() => onOpenTask(task.id)}
+              onAddUpdate={() => onAddUpdate(task.id)}
               onAssignToMe={
                 currentUserId != null && task.assigned_to?.id !== currentUserId
                   ? () => onAssignToMe(task)
@@ -312,6 +340,7 @@ export function BoardCanvas({
   board,
   onBoardChange,
   onOpenTask,
+  onAddUpdate,
   onCreateTask,
   onError,
 }: BoardCanvasProps) {
@@ -542,6 +571,7 @@ export function BoardCanvas({
               onRenameColumn={(id, name) => onRenameColumn(id, name)}
               onDeleteColumn={(id) => void onDeleteColumn(id)}
               onAssignToMe={(task) => void assignToMe(task)}
+              onAddUpdate={onAddUpdate}
               currentUserId={user?.id ?? null}
             />
           ))}

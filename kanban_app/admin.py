@@ -7,6 +7,7 @@ from .models import (
     Tag,
     TaskStatusHistory,
     TaskAssignmentHistory,
+    TaskUpdate,
 )
 
 
@@ -72,3 +73,10 @@ class TaskAssignmentHistoryAdmin(admin.ModelAdmin):
     list_display = ("id", "task", "old_assignee", "new_assignee", "changed_at")
     list_filter = ("changed_at",)
     search_fields = ("task__title", "old_assignee__username", "new_assignee__username")
+
+
+@admin.register(TaskUpdate)
+class TaskUpdateAdmin(admin.ModelAdmin):
+    list_display = ("id", "task", "author", "created_at")
+    list_filter = ("created_at",)
+    search_fields = ("task__title", "body", "author__username")
