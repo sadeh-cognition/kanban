@@ -22,6 +22,7 @@ import { useMemo, useRef, useState } from 'react'
 import { ApiClientError, api } from '../api/client'
 import type { Board, Column, Task } from '../api/types'
 import { useAuth } from '../auth/AuthContext'
+import { TaskHistoryHover } from './TaskHistoryHover'
 
 type BoardCanvasProps = {
   board: Board
@@ -68,73 +69,77 @@ function TaskCardView({
   task,
   onOpen,
   dragging,
+  historyDisabled,
   onAssignToMe,
   onAddUpdate,
 }: {
   task: Task
   onOpen?: () => void
   dragging?: boolean
+  historyDisabled?: boolean
   onAssignToMe?: () => void
   onAddUpdate?: () => void
 }) {
   return (
-    <div
-      className={`task-card ${dragging ? 'sortable-drag' : ''}`}
-      onClick={onOpen}
-      role={onOpen ? 'button' : undefined}
-    >
-      <div className="task-title">
-        {task.project_task_id != null && (
-          <span className="task-id">#{task.project_task_id} </span>
-        )}
-        {task.title}
-      </div>
-      {task.description && <div className="task-desc">{task.description}</div>}
-      <div className="task-meta">
-        {task.tags.map((tag) => (
-          <span
-            key={tag.id}
-            className="tag-pill"
-            style={{ backgroundColor: tag.color }}
-          >
-            {tag.name}
-          </span>
-        ))}
-        {task.assigned_to && (
-          <span className="assignee-chip">{task.assigned_to.username}</span>
-        )}
-      </div>
-      {(onAssignToMe || onAddUpdate) && (
-        <div className="task-actions">
-          {onAddUpdate && (
-            <button
-              type="button"
-              className="btn btn-sm btn-ghost"
-              onPointerDown={(e) => e.stopPropagation()}
-              onClick={(e) => {
-                e.stopPropagation()
-                onAddUpdate()
-              }}
-            >
-              Update
-            </button>
+    <TaskHistoryHover taskId={task.id} disabled={dragging || historyDisabled}>
+      <div
+        className={`task-card ${dragging ? 'sortable-drag' : ''}`}
+        onClick={onOpen}
+        role={onOpen ? 'button' : undefined}
+      >
+        <div className="task-title">
+          {task.project_task_id != null && (
+            <span className="task-id">#{task.project_task_id} </span>
           )}
-          {onAssignToMe && (
-            <button
-              type="button"
-              className="btn btn-sm btn-ghost"
-              onPointerDown={(e) => e.stopPropagation()}
-              onClick={(e) => {
-                e.stopPropagation()
-                onAssignToMe()
-              }}
+          {task.title}
+        </div>
+        {task.description && <div className="task-desc">{task.description}</div>}
+        <div className="task-meta">
+          {task.tags.map((tag) => (
+            <span
+              key={tag.id}
+              className="tag-pill"
+              style={{ backgroundColor: tag.color }}
             >
-              Assign to me
-            </button>
+              {tag.name}
+            </span>
+          ))}
+          {task.assigned_to && (
+            <span className="assignee-chip">{task.assigned_to.username}</span>
           )}
         </div>
-      )}
-    </div>
+        {(onAssignToMe || onAddUpdate) && (
+          <div className="task-actions">
+            {onAddUpdate && (
+              <button
+                type="button"
+                className="btn btn-sm btn-ghost"
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onAddUpdate()
+                }}
+              >
+                Update
+              </button>
+            )}
+            {onAssignToMe && (
+              <button
+                type="button"
+                className="btn btn-sm btn-ghost"
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onAssignToMe()
+                }}
+              >
+                Assign to me
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    </TaskHistoryHover>
   )
 }
 
@@ -165,6 +170,7 @@ function SortableTask({
         onOpen={onOpen}
         onAssignToMe={onAssignToMe}
         onAddUpdate={onAddUpdate}
+        historyDisabled={isDragging}
       />
     </div>
   )

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent } from 'react'
 import { Link } from 'react-router-dom'
 import type { StatusTask } from '../api/types'
+import { TaskHistoryHover } from './TaskHistoryHover'
 
 type Group = {
   name: string
@@ -267,76 +268,78 @@ function StatusTaskCard({
   const assigned = task.assigned_to != null
 
   return (
-    <div
-      className="task-card status-task-card"
-      onClick={onOpen}
-      role="button"
-    >
-      <div className="task-title">
-        {task.project_task_id != null && (
-          <span className="task-id">#{task.project_task_id} </span>
-        )}
-        {task.title}
-      </div>
-      <Link
-        to={`/projects/${task.project.id}`}
-        className="status-task-project"
-        onClick={(event) => event.stopPropagation()}
+    <TaskHistoryHover taskId={task.id}>
+      <div
+        className="task-card status-task-card"
+        onClick={onOpen}
+        role="button"
       >
-        {task.project.name}
-      </Link>
-      {task.description && <div className="task-desc">{task.description}</div>}
-      <div className="task-meta">
-        {task.tags.map((tag) => (
-          <span
-            key={tag.id}
-            className="tag-pill"
-            style={{ backgroundColor: tag.color }}
-          >
-            {tag.name}
-          </span>
-        ))}
-        {task.assigned_to && (
-          <span className="assignee-chip">{task.assigned_to.username}</span>
-        )}
-      </div>
-      <div className="task-actions">
-        <button
-          type="button"
-          className="btn btn-sm btn-ghost"
-          onClick={(event) => {
-            event.stopPropagation()
-            onAddUpdate()
-          }}
+        <div className="task-title">
+          {task.project_task_id != null && (
+            <span className="task-id">#{task.project_task_id} </span>
+          )}
+          {task.title}
+        </div>
+        <Link
+          to={`/projects/${task.project.id}`}
+          className="status-task-project"
+          onClick={(event) => event.stopPropagation()}
         >
-          Update
-        </button>
-      </div>
-      <label
-        className="status-task-status"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <span className="form-label">Status</span>
-        <select
-          className="form-control"
-          value={task.column_id}
-          disabled={!assigned || pending}
-          title={
-            assigned
-              ? undefined
-              : 'Assign the task before changing status'
-          }
-          onChange={(event) =>
-            onChangeStatus(task, Number(event.target.value))
-          }
-        >
-          {task.projectColumns.map((column) => (
-            <option key={column.id} value={column.id}>
-              {column.name}
-            </option>
+          {task.project.name}
+        </Link>
+        {task.description && <div className="task-desc">{task.description}</div>}
+        <div className="task-meta">
+          {task.tags.map((tag) => (
+            <span
+              key={tag.id}
+              className="tag-pill"
+              style={{ backgroundColor: tag.color }}
+            >
+              {tag.name}
+            </span>
           ))}
-        </select>
-      </label>
-    </div>
+          {task.assigned_to && (
+            <span className="assignee-chip">{task.assigned_to.username}</span>
+          )}
+        </div>
+        <div className="task-actions">
+          <button
+            type="button"
+            className="btn btn-sm btn-ghost"
+            onClick={(event) => {
+              event.stopPropagation()
+              onAddUpdate()
+            }}
+          >
+            Update
+          </button>
+        </div>
+        <label
+          className="status-task-status"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <span className="form-label">Status</span>
+          <select
+            className="form-control"
+            value={task.column_id}
+            disabled={!assigned || pending}
+            title={
+              assigned
+                ? undefined
+                : 'Assign the task before changing status'
+            }
+            onChange={(event) =>
+              onChangeStatus(task, Number(event.target.value))
+            }
+          >
+            {task.projectColumns.map((column) => (
+              <option key={column.id} value={column.id}>
+                {column.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+    </TaskHistoryHover>
   )
 }

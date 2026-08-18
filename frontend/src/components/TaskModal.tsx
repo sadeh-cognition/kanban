@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { api } from '../api/client'
 import type { ColumnName, Tag, TaskDetail, User } from '../api/types'
 import { useAuth } from '../auth/AuthContext'
+import { HistoryTimeline } from './HistoryTimeline'
 import { Modal } from './Modal'
 
 type TaskModalProps = {
@@ -347,40 +348,7 @@ export function TaskModal({
             </div>
           </form>
         )}
-        {task.history.length > 0 && (
-          <div className="history-timeline">
-            {task.history.map((event, idx) => (
-              <div key={`${event.type}-${event.changed_at}-${idx}`} className="history-item">
-                <div className={`history-dot ${event.type}`} />
-                <p className="muted-meta">
-                  {new Date(event.changed_at).toLocaleString()}
-                </p>
-                {event.type === 'status' ? (
-                  <p>
-                    {event.old_column
-                      ? `Moved from ${event.old_column.name} to ${event.new_column?.name ?? ''}`
-                      : `Created in ${event.new_column?.name ?? ''}`}
-                  </p>
-                ) : event.type === 'assignment' ? (
-                  <p>
-                    Assigned from{' '}
-                    {event.old_assignee?.username ?? 'Unassigned'} to{' '}
-                    {event.new_assignee?.username ?? 'Unassigned'}
-                  </p>
-                ) : (
-                  <>
-                    <p>
-                      Update from {event.author?.username ?? 'Unknown'}
-                    </p>
-                    {event.body && (
-                      <p className="history-update-body">{event.body}</p>
-                    )}
-                  </>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
+        <HistoryTimeline history={task.history} />
       </div>
 
       <div className="form-actions">
